@@ -37,7 +37,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 px-4">
+    <div className="bg-gradient-to-br from-slate-100 to-slate-200 px-4 py-12 flex justify-center">
 
       <Card className="w-full max-w-md shadow-2xl border border-slate-200">
 
@@ -71,7 +71,7 @@ export default function Register() {
                 required
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="John Doe"
+                placeholder="your full name "
               />
             </div>
 
