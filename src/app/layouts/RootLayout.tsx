@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router';
 import { Building2, ShoppingCart, User } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import logo from "../assets/logo.png";
+import { Button } from '@/shared/ui/button';
+import logo from "@/assets/logo.png";
 
 export default function RootLayout() {
   const location = useLocation();

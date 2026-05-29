@@ -1,9 +1,12 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { Building2, Home, Package, FileText, User, LogOut } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import logo from "../assets/logo.png";
+import { Button } from '@/shared/ui/button';
+import logo from "@/assets/logo.png";
+import { useAuth } from "@/features/auth/context/AuthContext";
 export default function BuyerLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
@@ -30,11 +33,17 @@ export default function BuyerLayout() {
               <Link to="/catalog">
                 <Button variant="outline">Browse Plans</Button>
               </Link>
-              <Link to="/login">
-                <Button variant="ghost" size="icon">
-                  <LogOut className="w-5 h-5" />
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  await logout();
+                  navigate("/login", { replace: true });
+                }}
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
             </div>
           </div>
         </div>

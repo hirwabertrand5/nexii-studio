@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -8,11 +8,14 @@ import {
   Users, 
   LogOut 
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import logo from "../assets/logo2.png";
+import { Button } from '@/shared/ui/button';
+import logo from "@/assets/logo2.png";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export default function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const navItems = [
     { path: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -63,12 +66,18 @@ export default function AdminLayout() {
         </nav>
 
         <div className="absolute bottom-4 left-4 right-4">
-          <Link to="/login">
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </Link>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            size="sm"
+            onClick={async () => {
+              await logout();
+              navigate("/login", { replace: true });
+            }}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
         </div>
       </aside>
 

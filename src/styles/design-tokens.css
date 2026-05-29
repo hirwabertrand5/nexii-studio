@@ -1,0 +1,79 @@
+/* Design tokens for NEXii Studio - Phase 8
+   Deep architectural blue palette, greys, accents, spacing and typography scale.
+*/
+:root{
+  /* Colors */
+  --color-bg: #ffffff;
+  --color-surface: #f7f7f8;
+  --color-architectural-blue: #0b3d6b; /* deep architectural blue */
+  --color-blue-600: #154a80;
+  --color-muted: #6b7280; /* tailwind gray-500 */
+  --color-muted-2: #9ca3af;
+  --color-accent: #f59e0b; /* warm amber accent */
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-border: #e6e7ea;
+
+  /* Typography */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --font-display: "Merriweather", "Georgia", serif;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+  --text-4xl: 40px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(11,61,107,0.04);
+  --shadow-md: 0 6px 18px rgba(11,61,107,0.08);
+  --shadow-lg: 0 18px 40px rgba(11,61,107,0.12);
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  :root{
+    --color-bg: #0b1220;
+    --color-surface: #07101a;
+    --color-architectural-blue: #cfe7ff;
+    --color-muted: #9aa4b2;
+    --color-border: rgba(255,255,255,0.06);
+  }
+}
+
+/* Utility classes for consistent usage */
+.nexii-card{
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.nexii-hero{
+  padding: var(--space-6) 0;
+  color: var(--color-architectural-blue);
+}
+
+.nexii-badge-primary{
+  background: linear-gradient(90deg, var(--color-architectural-blue), var(--color-blue-600));
+  color: white;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
