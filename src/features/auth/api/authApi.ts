@@ -29,3 +29,7 @@ export async function apiForgotPassword(email: string) {
   return http<{ message: string }>("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
 }
 
+export async function apiGoogleLogin(idToken: string) {
+  return http<{ user: AuthUser }>("/api/auth/google-login", { method: "POST", body: JSON.stringify({ idToken }) });
+}
+

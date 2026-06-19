@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: false, select: false },
     role: { type: String, enum: ["buyer", "admin"], default: "buyer", required: true },
     country: { type: String, required: false, trim: true },
+    // Optional Google OAuth mapping
+    googleId: { type: String, required: false, unique: true, sparse: true, index: true },
+    // Avatar/profile picture URL (e.g., from Google)
+    avatarUrl: { type: String, required: false, trim: true },
     accountStatus: { type: String, enum: ["active", "suspended"], default: "active", index: true },
     // WebAuthn credentials registered for this user
     credentials: { type: [credentialSchema], required: false, default: [] },
@@ -40,6 +44,8 @@ export type UserDoc = InferSchemaType<typeof userSchema> & {
   _id: mongoose.Types.ObjectId;
   credentials: WebAuthnCredential[];
   currentChallenge?: string | null;
+  googleId?: string | null;
+  avatarUrl?: string | null;
 };
 
 export const User = mongoose.model<UserDoc>("User", userSchema);

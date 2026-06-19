@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ComponentProps } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
@@ -8,14 +9,26 @@ import { ImageWithFallback } from '@/shared/components/ImageWithFallback';
 import { housePlans } from '@/shared/data/mockData';
 import { ArrowLeft, CheckCircle, CreditCard, Smartphone, Building, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import { http } from '@/shared/api/http';
+import { useAuth } from '@/features/auth/context/AuthContext';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? '');
+type ElementsStripeProp = ComponentProps<typeof Elements>['stripe'];
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const plan = housePlans.find(p => p.id === id);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [currency, setCurrency] = useState('USD');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [paypalLoading, setPaypalLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   if (!plan) {
     return (
@@ -30,78 +43,101 @@ export default function Checkout() {
     );
   }
 
-  const handleCheckout = async () => {
-    if (!paymentMethod) {
-      toast.error('Please select a payment method');
-      return;
-    }
-    setIsProcessing(true);
+  // Create an order on the backend (requires authentication)
+  async function createOrderOnServer(method: string) {
+    const payload = await http('/api/orders/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plans: [plan!.id], paymentMethod: method, currency })
+    });
+    const orderId = (payload as any)?.order?._id ?? (payload as any)?.order?.id;
+    if (!orderId) throw new Error('Order not created');
+    return orderId as string;
+  }
 
-    try {
-      // Attempt to create an order on the server (requires auth)
-      const createOrderRes = await fetch('/api/orders/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plans: [plan.id], paymentMethod, currency })
-      });
+  // Stripe card form handler component (uses Elements context)
+  function StripeCardForm({ existingOrderId }: { existingOrderId?: string }) {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [name, setName] = useState(user?.fullName ?? "");
+    const [loading, setLoadingLocal] = useState(false);
 
-      if (!createOrderRes.ok) {
-        // If server rejects (e.g., unauthenticated), fall back to simulated flow
-        throw new Error('Unable to create order on server');
+    const CARD_OPTIONS = {
+      style: {
+        base: { fontSize: '16px', color: '#0f172a', '::placeholder': { color: '#94a3b8' } },
+        invalid: { color: '#ef4444' }
       }
+    };
 
-      const createPayload = await createOrderRes.json();
-      const order = createPayload?.data?.order;
-      const orderId = order?._id ?? order?.id;
-
-      if (!orderId) throw new Error('Order id not returned');
-
-      if (paymentMethod === 'card') {
-        const res = await fetch('/api/payments/stripe/create-intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId })
-        });
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload?.message ?? 'Stripe initialization failed');
-        toast.success('Stripe payment initialized. Continue with Stripe Elements (client integration required).');
-      } else if (paymentMethod === 'paypal') {
-        const res = await fetch('/api/payments/paypal/create-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId })
-        });
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload?.message ?? 'PayPal initialization failed');
-        const approveUrl = payload?.data?.payment?.approveUrl;
-        if (approveUrl) window.location.href = approveUrl;
-        else toast.success('PayPal order created. Complete payment in new tab.');
-      } else if (paymentMethod === 'mobile-money') {
-        const res = await fetch('/api/payments/flutterwave/initialize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId })
-        });
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload?.message ?? 'Mobile money initialization failed');
-        const authUrl = payload?.data?.payment?.authorizationUrl ?? payload?.data?.payment?.authorizationUrl;
-        if (authUrl) window.location.href = authUrl;
-        else toast.success('Mobile money initialized. Follow provider flow.');
-      } else if (paymentMethod === 'bank-transfer') {
-        toast.success('Please follow the bank transfer instructions shown on the page.');
+    const handleStripePayment = async () => {
+      setPaymentError(null);
+      if (!stripe || !elements) {
+        setPaymentError('Payment system not ready');
+        return;
       }
+      setLoadingLocal(true);
+      setStripeLoading(true);
+      try {
+        const orderId = existingOrderId ?? (await createOrderOnServer('card'));
 
-      setIsProcessing(false);
-    } catch (err) {
-      // Fallback simulated success
-      setIsProcessing(false);
-      toast.error(String((err as Error).message ?? 'Payment failed; falling back to local simulation'));
-      setTimeout(() => {
-        toast.success('Payment simulated as successful. Redirecting...');
-        setTimeout(() => navigate('/dashboard/purchased'), 1200);
-      }, 800);
-    }
-  };
+        const init = await http('/api/payments/stripe/create-intent', {
+          method: 'POST',
+          body: JSON.stringify({ orderId })
+        });
+        const clientSecret = (init as any)?.payment?.clientSecret;
+        if (!clientSecret) throw new Error('Unable to initialize Stripe payment');
+
+        const card = elements.getElement(CardElement);
+        if (!card) throw new Error('Card input not found');
+
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: { card, billing_details: { name: name || undefined, email: user?.email || undefined } }
+        });
+
+        if (result.error) {
+          throw new Error(result.error.message ?? 'Card was declined');
+        }
+
+        // PaymentIntent succeeded or requires capture; navigate to success page and rely on webhook to finalize
+        toast.success('Payment successful');
+        navigate(`/payment/success?gateway=stripe&orderId=${orderId}`);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        setPaymentError(m);
+        toast.error(m);
+      } finally {
+        setLoadingLocal(false);
+        setStripeLoading(false);
+      }
+    };
+
+    return (
+      <div className="mt-4">
+        <Label>Cardholder name</Label>
+        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full border rounded px-2 py-1 mt-1" />
+        <div className="mt-4 p-3 border rounded">
+          <CardElement options={CARD_OPTIONS} />
+        </div>
+        {paymentError && <p className="text-sm text-red-600 mt-2">{paymentError}</p>}
+        <Button onClick={handleStripePayment} disabled={loading || stripeLoading} className="w-full mt-4">
+          {loading || stripeLoading ? 'Processing...' : `Pay ${currency} ${plan?.price.toLocaleString()}`}
+        </Button>
+      </div>
+    );
+  }
+
+  // PayPal create/capture callbacks
+  async function handleCreatePayPalOrder(): Promise<string> {
+    // create internal order first
+    const orderId = await createOrderOnServer('paypal');
+    const res = await http('/api/payments/paypal/create-order', {
+      method: 'POST',
+      body: JSON.stringify({ orderId })
+    });
+    const paypalOrderId = (res as any)?.payment?.paypalOrderId;
+    if (!paypalOrderId) throw new Error('Unable to create PayPal order');
+    return paypalOrderId;
+  }
+
 
   const paymentMethods = [
     {
@@ -219,14 +255,84 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <Button
-                  onClick={handleCheckout}
-                  disabled={isProcessing || !paymentMethod}
-                  size="lg"
-                  className="w-full mt-6"
-                >
-                  {isProcessing ? 'Processing...' : `Pay ${currency} ${plan.price.toLocaleString()}`}
-                </Button>
+                {/* Payment provider UIs (Stripe Elements + PayPal) */}
+                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID ?? 'sb', currency }}>
+                  <Elements stripe={stripePromise as unknown as ElementsStripeProp}>
+                    {paymentMethod === 'card' && (
+                      <div className="mt-6">
+                        <StripeCardForm />
+                      </div>
+                    )}
+
+                    {paymentMethod === 'paypal' && (
+                      <div className="mt-6">
+                        <PayPalButtons
+                          style={{ layout: 'vertical' }}
+                          createOrder={async (_data, _actions) => {
+                            try {
+                              setPaypalLoading(true);
+                              const paypalOrderId = await handleCreatePayPalOrder();
+                              return paypalOrderId;
+                            } finally {
+                              setPaypalLoading(false);
+                            }
+                          }}
+                          onApprove={async (data, _actions) => {
+                            try {
+                              setPaypalLoading(true);
+                              await http('/api/payments/paypal/capture-order', {
+                                method: 'POST',
+                                body: JSON.stringify({ paypalOrderId: data.orderID })
+                              });
+                              toast.success('Payment captured');
+                              navigate(`/payment/success?gateway=paypal&orderId=${data.orderID}`);
+                            } catch (err) {
+                              toast.error((err as Error).message ?? 'PayPal capture failed');
+                            } finally {
+                              setPaypalLoading(false);
+                            }
+                          }}
+                          onError={(err) => {
+                            toast.error('PayPal error: ' + String(err));
+                          }}
+                        />
+                      </div>
+                    )}
+                  </Elements>
+                </PayPalScriptProvider>
+
+                {/* Mobile money and bank flows fallback button */}
+                {(paymentMethod === 'mobile-money' || paymentMethod === 'bank-transfer') && (
+                  <Button
+                    onClick={async () => {
+                      setPaymentError(null);
+                      setIsProcessing(true);
+                      try {
+                        if (paymentMethod === 'mobile-money') {
+                          const orderId = await createOrderOnServer('mobile-money');
+                          const res = await http('/api/payments/flutterwave/initialize', {
+                            method: 'POST',
+                            body: JSON.stringify({ orderId })
+                          });
+                          const authUrl = (res as any)?.payment?.authorizationUrl;
+                          if (authUrl) window.location.href = authUrl;
+                          else toast.success('Mobile money initialized. Follow provider flow.');
+                        } else {
+                          toast.success('Please follow the bank transfer instructions shown on the page.');
+                        }
+                      } catch (err) {
+                        toast.error((err as Error).message ?? 'Payment initialization failed');
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    disabled={isProcessing}
+                    size="lg"
+                    className="w-full mt-6"
+                  >
+                    {isProcessing ? 'Processing...' : `Pay ${currency} ${plan.price.toLocaleString()}`}
+                  </Button>
+                )}
               </CardContent>
             </Card>
 

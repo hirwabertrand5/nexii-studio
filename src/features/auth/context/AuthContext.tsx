@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "../types";
-import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify } from "../api/authApi";
+import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify, apiGoogleLogin } from "../api/authApi";
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 
 type AuthState = {
@@ -8,6 +8,7 @@ type AuthState = {
   isLoading: boolean;
   isAuthenticated: boolean;
   login(input: { email: string }): Promise<AuthUser>;
+  googleLogin(token: string): Promise<AuthUser>;
   register(input: { fullName: string; email: string }): Promise<AuthUser>;
   logout(): Promise<void>;
   refresh(): Promise<void>;
@@ -42,6 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isAuthenticated: Boolean(user),
+      async googleLogin(token: string) {
+        // send token to server for verification; server will set cookies
+        await apiGoogleLogin(token);
+        await refresh();
+        return user as AuthUser;
+      },
       async login(input) {
         // Step 1: ask server for challenge
         const challengeRes = await apiLoginChallenge({ email: input.email });

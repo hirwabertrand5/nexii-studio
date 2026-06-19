@@ -9,10 +9,11 @@ import { countries } from "@/shared/data/countries";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, user, isLoading } = useAuth();
+  const { register, user, isLoading, googleLogin } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -48,6 +49,21 @@ export default function Register() {
       navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (res: any) => {
+    const credential = res?.credential;
+    if (!credential) return toast.error("Google sign-in failed");
+    setIsSubmitting(true);
+    try {
+      await googleLogin(credential);
+      toast.success("Signed in with Google");
+      navigate(user?.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Google login failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -167,6 +183,13 @@ export default function Register() {
             </Button>
 
           </form>
+
+          <div className="mt-4">
+            <div className="text-center text-sm text-slate-500 mb-3">Or continue with</div>
+            <div className="flex justify-center">
+              <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => toast.error("Google sign-in failed")} />
+            </div>
+          </div>
 
           {/* Login link */}
           <div className="mt-6 text-center text-sm">
