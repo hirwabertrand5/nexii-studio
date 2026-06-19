@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 import { authRoutes } from "./routes/authRoutes.js";
 import { planRoutes } from "./routes/planRoutes.js";
 import { wishlistRoutes } from "./routes/wishlistRoutes.js";
@@ -9,6 +10,7 @@ import { orderRoutes } from "./routes/orderRoutes.js";
 import { adminOrderRoutes } from "./routes/adminOrderRoutes.js";
 import { downloadRoutes } from "./routes/downloadRoutes.js";
 import { paymentRoutes } from "./routes/paymentRoutes.js";
+import { webhookRoutes } from "./routes/webhookRoutes.js";
 import { adminTransactionRoutes } from "./routes/adminTransactionRoutes.js";
 import { adminDashboardRoutes } from "./routes/adminDashboardRoutes.js";
 import { adminPlanRoutes } from "./routes/adminPlanRoutes.js";
@@ -29,8 +31,16 @@ export function createApp() {
 
   // CORS configuration
   const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+  const allowedOrigins = corsOrigin.split(",").map((url) => url.trim());
+  console.log("[server] CORS allowed origins:", allowedOrigins);
+
   app.use(cors({
-    origin: corsOrigin.split(",").map(url => url.trim()),
+    origin: (origin, callback) => {
+      // If no origin (e.g., curl, server-to-server), allow
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -49,6 +59,9 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ success: true, data: { ok: true } }));
 
+  // Cookie parser for access/refresh cookies
+  app.use(cookieParser());
+
   // Auth routes with stricter rate limiting
   app.use("/api/auth", loginLimiter, authRoutes);
   
@@ -59,6 +72,7 @@ export function createApp() {
   app.use("/api/admin/orders", adminOrderRoutes);
   app.use("/api/downloads", downloadRoutes);
   app.use("/api/payments", paymentRoutes);
+  app.use("/api/webhooks", webhookRoutes);
   app.use("/api/admin/transactions", adminTransactionRoutes);
   app.use("/api/admin/dashboard", adminDashboardRoutes);
   app.use("/api/admin/plans", adminPlanRoutes);

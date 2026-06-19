@@ -10,16 +10,13 @@ export class HttpError extends Error {
   }
 }
 
-export async function http<T>(
-  path: string,
-  options?: RequestInit & { token?: string | null }
-): Promise<T> {
-  const token = options?.token ?? null;
+export async function http<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    // rely on HTTP-only cookies for auth; include credentials so browser sends cookies
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options?.headers ?? {})
     }
   });

@@ -1,33 +1,26 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "../types";
-import { apiLogin, apiLogout, apiMe, apiRegister } from "../api/authApi";
+import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify } from "../api/authApi";
+import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 
 type AuthState = {
   user: AuthUser | null;
-  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login(input: { email: string; password: string }): Promise<AuthUser>;
-  register(input: { fullName: string; email: string; password: string; country?: string }): Promise<AuthUser>;
+  login(input: { email: string }): Promise<AuthUser>;
+  register(input: { fullName: string; email: string }): Promise<AuthUser>;
   logout(): Promise<void>;
   refresh(): Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
 
-const STORAGE_KEY = "nexii.auth.token";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
-    if (!token) {
-      setUser(null);
-      return;
-    }
-    const res = await apiMe(token);
+    const res = await apiMe();
     setUser(res.user);
   };
 
@@ -36,8 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await refresh();
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
-        setToken(null);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -49,39 +40,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(() => {
     return {
       user,
-      token,
       isLoading,
-      isAuthenticated: Boolean(token && user),
+      isAuthenticated: Boolean(user),
       async login(input) {
-        const res = await apiLogin(input);
-        localStorage.setItem(STORAGE_KEY, res.token);
-        setToken(res.token);
-        setUser(res.user);
-        return res.user;
+        // Step 1: ask server for challenge
+        const challengeRes = await apiLoginChallenge({ email: input.email });
+        const options = challengeRes.options;
+        const userId = challengeRes.userId;
+
+        // Step 2: trigger native auth prompt
+        const assertion = await startAuthentication(options);
+
+        // Step 3: verify with server (server will set cookies)
+        await apiLoginVerify({ ...assertion, id: userId });
+
+        // Step 4: refresh user state
+        await refresh();
+        return user as AuthUser;
       },
       async register(input) {
-        const res = await apiRegister(input);
-        localStorage.setItem(STORAGE_KEY, res.token);
-        setToken(res.token);
-        setUser(res.user);
-        return res.user;
+        const challengeRes = await apiRegisterChallenge({ fullName: input.fullName, email: input.email });
+        const options = challengeRes.options;
+        const userId = challengeRes.userId;
+
+        const attestation = await startRegistration(options);
+        await apiRegisterVerify({ ...attestation, id: userId });
+
+        await refresh();
+        return user as AuthUser;
       },
       async logout() {
-        const current = token;
-        localStorage.removeItem(STORAGE_KEY);
-        setToken(null);
-        setUser(null);
-        if (current) {
-          try {
-            await apiLogout(current);
-          } catch {
-            // ignore
-          }
+        try {
+          await apiLogout();
+        } catch {
+          // ignore
         }
+        setUser(null);
       },
       refresh
     };
-  }, [isLoading, token, user]);
+  }, [isLoading, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

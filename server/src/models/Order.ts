@@ -10,7 +10,7 @@ export const PAYMENT_METHODS = [
 
 export const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"] as const;
 export const ORDER_STATUSES = ["processing", "completed", "cancelled"] as const;
-export const PAYMENT_GATEWAYS = ["paystack", "flutterwave", "mobile-money"] as const;
+export const PAYMENT_GATEWAYS = ["paystack", "flutterwave", "mobile-money", "stripe", "paypal", "bank-transfer"] as const;
 export const VERIFICATION_STATUSES = ["pending", "verified", "failed"] as const;
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];

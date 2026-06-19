@@ -12,6 +12,13 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
+  "ts-node": {
+    "esm": true,
+    "experimentalEsm": true,
+    "compilerOptions": {
+      "module": "ESNext"
+    }
+  },
   "include": ["src"]
 }
 

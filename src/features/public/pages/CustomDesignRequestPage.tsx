@@ -7,7 +7,7 @@ import { Textarea } from '@/shared/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
-import { africanCountries } from '@/shared/data/mockData';
+import { countries } from '@/shared/data/countries';
 import { toast } from 'sonner';
 
 export default function CustomDesignRequest() {
@@ -98,7 +98,7 @@ export default function CustomDesignRequest() {
                             <SelectValue placeholder="Select your country" />
                           </SelectTrigger>
                           <SelectContent>
-                            {africanCountries.map((country) => (
+                            {countries.map((country) => (
                               <SelectItem key={country} value={country}>
                                 {country}
                               </SelectItem>

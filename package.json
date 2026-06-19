@@ -12,6 +12,7 @@
     "server:start": "cd server && npm start"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^6.0.0",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",
@@ -67,7 +68,10 @@
     "sonner": "2.0.3",
     "tailwind-merge": "3.2.0",
     "tw-animate-css": "1.3.8",
-    "vaul": "1.1.2"
+    "vaul": "1.1.2",
+    "@stripe/stripe-js": "^1.63.0",
+    "@stripe/react-stripe-js": "^2.3.0",
+    "@paypal/react-paypal-js": "^7.8.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",

@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Search, Building2, FileText, Download, Star, CheckCircle } from 'lucide-react';
+import { Search, Building2, FileText, Download, Star, CheckCircle, Home as HomeIcon, Package as PackageIcon, MapPin as MapPinIcon } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Card, CardContent } from '@/shared/ui/card';
@@ -16,13 +16,22 @@ export default function Home() {
   };
 
   const featuredPlans = housePlans.slice(0, 3);
+  const bestSelling = housePlans.slice(0, 6);
   const mainCategories = categories.filter(c => c !== 'All Plans');
 
-  // Rwandan Franc (RWF) formatter
-  const formatRwf = (amount: number) =>
-    new Intl.NumberFormat('en-RW', {
+  const categoryIcons: Record<string, any> = {
+    'Bungalow': HomeIcon,
+    'Duplex': Building2,
+    'Modern Villa': PackageIcon,
+    'Small Plot Homes': MapPinIcon,
+    'African Contemporary': Star,
+  };
+
+  // US Dollar (USD) formatter
+  const formatUsd = (amount: number) =>
+    new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'RWF',
+      currency: 'USD',
       maximumFractionDigits: 0,
     }).format(amount);
 
@@ -42,7 +51,7 @@ export default function Home() {
             Find Your Ideal House Plan
           </h1>
           <p className="text-xl md:text-2xl mb-12 text-white/90 max-w-3xl mx-auto">
-            Premium architectural designs for the African market. Browse ready-made plans or request custom designs.
+            Premium architectural designs for the global market. Browse ready-made plans or request custom designs.
           </p>
 
           {/* Search Bar */}
@@ -96,7 +105,7 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-2xl font-bold text-primary">
-                        {formatRwf(plan.price)}
+                        {formatUsd(plan.price)}
                       </p>
                     </div>
                     <Link to={`/plan/${plan.id}`}>
@@ -129,16 +138,73 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {mainCategories.map((category) => (
-              <Link key={category} to={`/catalog?category=${encodeURIComponent(category)}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardContent className="p-6 text-center">
-                    <Building2 className="w-12 h-12 mx-auto mb-3 text-primary" />
-                    <h4>{category}</h4>
-                  </CardContent>
-                </Card>
-              </Link>
+            {mainCategories.map((category) => {
+              const Icon = categoryIcons[category] ?? Building2;
+              return (
+                <Link key={category} to={`/catalog?category=${encodeURIComponent(category)}`}>
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                    <CardContent className="p-6 text-center">
+                      <Icon className="w-12 h-12 mx-auto mb-3 text-primary" />
+                      <h4>{category}</h4>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Best Selling Plans (inserted between Categories and Why Choose NEXii) */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl mb-4">Best Selling Plans</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Our most purchased and loved house plans — popular with homeowners worldwide
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {bestSelling.map((plan) => (
+              <Card key={plan.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="aspect-[4/3] bg-muted">
+                  <ImageWithFallback
+                    src={`https://images.unsplash.com/photo-${plan.image === 'modern-villa-african' ? '1600585154340-be6161a56a0c' : plan.image === 'compact-bungalow' ? '1600607687939-ce8a6c25118c' : plan.image === 'luxury-duplex' ? '1600566753190-17f0baa2a6c3' : plan.image === 'small-plot-home' ? '1507089947368-19c1da9775ae' : plan.image === 'contemporary-family' ? '1505691723518-36a7b6a1ec1a' : '1493809842364-78817add7ffb'}?w=800&q=80`}
+                    alt={plan.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-6">
+                  <h3 className="text-xl mb-2">{plan.name}</h3>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+                    <span>{plan.bedrooms} Beds</span>
+                    <span>•</span>
+                    <span>{plan.bathrooms} Baths</span>
+                    <span>•</span>
+                    <span>{plan.area}m²</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-2xl font-bold text-primary">
+                        {formatUsd(plan.price)}
+                      </p>
+                    </div>
+                    <Link to={`/plan/${plan.id}`}>
+                      <Button>View Plan</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Link to="/catalog">
+              <Button size="lg" variant="outline">
+                View All Plans
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -148,9 +214,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl mb-4">Why Choose NEXii</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Premium architectural services designed for the African market
-            </p>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+              Premium architectural services designed for the global market
+              </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

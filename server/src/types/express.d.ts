@@ -7,6 +7,8 @@ declare global {
       auth?: { userId: string; role: "buyer" | "admin" };
       admin?: { _id: Types.ObjectId; role: "admin" };
       rawBody?: Buffer;
+      // cookies provided by cookie-parser
+      cookies?: Record<string, string>;
     }
   }
 }

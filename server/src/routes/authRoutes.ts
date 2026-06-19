@@ -1,12 +1,24 @@
 import { Router } from "express";
-import { forgotPassword, login, logout, me, register } from "../controllers/authController.js";
+import {
+	registerChallenge,
+	registerVerify,
+	loginChallenge,
+	loginVerify,
+	me,
+	logout,
+	refreshTokenHandler,
+	forgotPassword
+} from "../controllers/authController.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const authRoutes = Router();
 
-authRoutes.post("/register", asyncHandler(register));
-authRoutes.post("/login", asyncHandler(login));
+authRoutes.post("/register-challenge", asyncHandler(registerChallenge));
+authRoutes.post("/register-verify", asyncHandler(registerVerify));
+authRoutes.post("/login-challenge", asyncHandler(loginChallenge));
+authRoutes.post("/login-verify", asyncHandler(loginVerify));
+authRoutes.post("/refresh", asyncHandler(refreshTokenHandler));
 authRoutes.get("/me", requireAuth, asyncHandler(me));
 authRoutes.post("/logout", requireAuth, asyncHandler(logout));
 authRoutes.post("/forgot-password", asyncHandler(forgotPassword));

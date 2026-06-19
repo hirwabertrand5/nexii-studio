@@ -4,7 +4,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
-import { africanCountries } from '@/shared/data/mockData';
+import { countries } from '@/shared/data/countries';
 import { toast } from 'sonner';
 
 export default function BuyerProfile() {
@@ -75,7 +75,7 @@ export default function BuyerProfile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {africanCountries.map((country) => (
+                      {countries.map((country) => (
                         <SelectItem key={country} value={country}>
                           {country}
                         </SelectItem>

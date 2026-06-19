@@ -185,7 +185,7 @@ export async function listAdminTransactions(query: TransactionQuery) {
   const skip = (page - 1) * limit;
 
   const filter: Record<string, any> = {};
-  const gateway = optionalEnumValue(query.gateway, ["paystack", "flutterwave", "mobile-money"] as const, "gateway");
+  const gateway = optionalEnumValue(query.gateway, ["paystack", "flutterwave", "mobile-money", "stripe", "paypal", "bank-transfer"] as const, "gateway");
   const status = optionalEnumValue(query.status, ["pending", "paid", "failed", "refunded"] as const, "status");
   if (gateway) filter.gateway = gateway;
   if (status) filter.status = status;

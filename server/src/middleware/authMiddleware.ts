@@ -1,51 +1,58 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import { User } from "../models/User.js";
+import { verifyAccessToken, verifyRefreshToken, createRefreshToken, revokeRefreshToken, generateAccessToken } from "../utils/generateToken.js";
+import { RefreshToken } from "../models/RefreshToken.js";
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ success: false, message: "Unauthorized" });
+const ACCESS_COOKIE = "access_token";
+const REFRESH_COOKIE = "refresh_token";
+
+async function tryRefresh(req: Request, res: Response, next: NextFunction) {
+  const raw = req.cookies?.[REFRESH_COOKIE];
+  if (!raw) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  const doc = await verifyRefreshToken(raw);
+  if (!doc) return res.status(401).json({ success: false, message: "Invalid refresh token" });
+
+  // rotate refresh token
+  try {
+    await revokeRefreshToken(raw);
+  } catch {
+    // ignore
   }
 
-  const token = authHeader.slice("Bearer ".length);
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return res.status(500).json({ success: false, message: "Server misconfigured" });
+  const newRaw = await createRefreshToken(String((doc as any).user._id), req.ip, String(req.headers["user-agent"] ?? ""));
+  const access = generateAccessToken({ userId: String((doc as any).user._id), role: (doc as any).user.role });
+
+  res.cookie(ACCESS_COOKIE, access, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 15 * 60 * 1000 });
+  res.cookie(REFRESH_COOKIE, newRaw, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+  req.auth = { userId: String((doc as any).user._id), role: (doc as any).user.role };
+  return next();
+}
+
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const access = req.cookies?.[ACCESS_COOKIE];
+  if (!access) return tryRefresh(req, res, next);
 
   try {
-    const decoded = jwt.verify(token, secret) as { userId: string; role: "buyer" | "admin" };
+    const decoded = verifyAccessToken(access);
     req.auth = { userId: decoded.userId, role: decoded.role };
     return next();
-  } catch {
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+  } catch (err: any) {
+    // token expired -> try refresh flow
+    if (err && err.name === "TokenExpiredError") {
+      return tryRefresh(req, res, next);
+    }
+    return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 }
 
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ success: false, message: "Unauthorized" });
-  }
-
-  const token = authHeader.slice("Bearer ".length);
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return res.status(500).json({ success: false, message: "Server misconfigured" });
-
-  try {
-    const decoded = jwt.verify(token, secret) as { userId: string; role: "buyer" | "admin" };
-    req.auth = { userId: decoded.userId, role: decoded.role };
-
-    // If admin, fetch admin user details
-    if (decoded.role === "admin") {
-      const admin = await User.findById(decoded.userId);
-      if (!admin) {
-        return res.status(404).json({ success: false, message: "Admin user not found" });
-      }
-      (req as any).admin = { _id: admin._id, role: admin.role };
+  await requireAuth(req, res, async () => {
+    // If admin, attach admin info
+    if (req.auth?.role === "admin") {
+      // admin lookup left intentionally lightweight — controllers can populate if needed
+      (req as any).admin = { _id: req.auth.userId, role: "admin" } as any;
     }
-
     return next();
-  } catch {
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
-  }
+  });
 }

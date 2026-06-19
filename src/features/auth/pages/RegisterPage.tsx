@@ -5,7 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { africanCountries } from "@/shared/data/mockData";
+import { countries } from "@/shared/data/countries";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -121,7 +121,7 @@ export default function Register() {
                 </SelectTrigger>
 
                 <SelectContent>
-                  {africanCountries.map((country) => (
+                  {countries.map((country) => (
                     <SelectItem key={country} value={country}>
                       {country}
                     </SelectItem>
