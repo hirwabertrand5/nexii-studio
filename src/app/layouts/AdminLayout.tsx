@@ -28,7 +28,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+      <aside className="w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col">
         <div className="p-6">
 <Link to="/" className="flex items-center">
   <img
@@ -40,7 +40,7 @@ export default function AdminLayout() {
           <p className="text-xs text-sidebar-foreground/70 mt-1">Admin Panel</p>
         </div>
 
-        <nav className="px-4 space-y-1">
+        <nav className="px-4 space-y-1 flex-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = 
@@ -65,14 +65,14 @@ export default function AdminLayout() {
           })}
         </nav>
 
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="p-4 mt-auto border-t border-sidebar-border">
           <Button
             variant="outline"
             className="w-full justify-start"
             size="sm"
             onClick={async () => {
               await logout();
-              navigate("/login", { replace: true });
+              navigate("/admin/login", { replace: true });
             }}
           >
             <LogOut className="w-4 h-4 mr-2" />

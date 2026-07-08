@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -25,24 +27,16 @@ export default function Register() {
     name: "",
     email: "",
     country: "",
-    password: "",
-    confirmPassword: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const user = await register({
         fullName: formData.name,
         email: formData.email,
-        password: formData.password,
         country: formData.country || undefined
       });
       toast.success("Account created successfully!");
@@ -54,20 +48,28 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSuccess = async (res: any) => {
-    const credential = res?.credential;
-    if (!credential) return toast.error("Google sign-in failed");
-    setIsSubmitting(true);
-    try {
-      await googleLogin(credential);
-      toast.success("Signed in with Google");
-      navigate(user?.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google login failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleGoogleSuccess = useCallback(
+    async (res: any) => {
+      const credential = res?.credential;
+      if (!credential) return toast.error("Google sign-in failed");
+
+      setIsSubmitting(true);
+      try {
+        const user = await googleLogin(credential);
+        toast.success("Signed in with Google");
+        navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Google login failed");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [googleLogin, navigate]
+  );
+
+  const handleGoogleError = useCallback(() => {
+    toast.error("Google sign-in failed");
+  }, []);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -147,32 +149,6 @@ export default function Register() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-
-              <Input
-                id="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                placeholder="••••••••"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-
-              <Input
-                id="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => handleChange("confirmPassword", e.target.value)}
-                placeholder="••••••••"
-              />
-            </div>
-
             <Button
               type="submit"
               size="lg"
@@ -184,12 +160,18 @@ export default function Register() {
 
           </form>
 
-          <div className="mt-4">
-            <div className="text-center text-sm text-slate-500 mb-3">Or continue with</div>
-            <div className="flex justify-center">
-              <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => toast.error("Google sign-in failed")} />
+          <p className="mt-3 text-center text-xs text-slate-500">
+            Registration uses your email and creates a passkey, not a password.
+          </p>
+
+          {googleClientId ? (
+            <div className="mt-4">
+              <div className="text-center text-sm text-slate-500 mb-3">Or continue with</div>
+              <div className="flex justify-center">
+                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {/* Login link */}
           <div className="mt-6 text-center text-sm">

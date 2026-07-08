@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import fs from "fs";
+import path from "path";
 import { authRoutes } from "./routes/authRoutes.js";
 import { planRoutes } from "./routes/planRoutes.js";
 import { wishlistRoutes } from "./routes/wishlistRoutes.js";
@@ -19,7 +21,7 @@ import { adminUserRoutes } from "./routes/adminUserRoutes.js";
 import { adminCustomRequestRoutes } from "./routes/adminCustomRequestRoutes.js";
 import { requestRoutes } from "./routes/requestRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorMiddleware.js";
-import { loginLimiter, apiLimiter } from "./middleware/rateLimitMiddleware.js";
+import { apiLimiter } from "./middleware/rateLimitMiddleware.js";
 
 dotenv.config();
 
@@ -27,7 +29,23 @@ export function createApp() {
   const app = express();
 
   // Security middleware
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "https://js.stripe.com"],
+          frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+          connectSrc: ["'self'", "https://api.stripe.com", "https://js.stripe.com"],
+          fontSrc: ["'self'", "https://js.stripe.com", "https://fonts.gstatic.com", "data:"],
+          imgSrc: ["'self'", "data:", "https:", "http://localhost:5000", "http://127.0.0.1:5000"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+        },
+      },
+    })
+  );
 
   // CORS configuration
   const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -62,8 +80,16 @@ export function createApp() {
   // Cookie parser for access/refresh cookies
   app.use(cookieParser());
 
-  // Auth routes with stricter rate limiting
-  app.use("/api/auth", loginLimiter, authRoutes);
+  // Serve locally uploaded files during development or when cloud storage is unavailable
+  const uploadsDir = path.resolve(process.cwd(), "..", "uploads");
+  const serverUploadsDir = path.resolve(process.cwd(), "uploads");
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  fs.mkdirSync(serverUploadsDir, { recursive: true });
+  app.use("/uploads", express.static(uploadsDir));
+  app.use("/uploads", express.static(serverUploadsDir));
+
+  // Auth routes
+  app.use("/api/auth", authRoutes);
   
   // Other API routes
   app.use("/api/plans", planRoutes);

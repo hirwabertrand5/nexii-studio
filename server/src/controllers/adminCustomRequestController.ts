@@ -109,7 +109,8 @@ export const sendQuotation = asyncHandler(async (req: Request, res: Response) =>
   const { id } = req.params;
   const { amount, currency = "USD", description, timeline, pricingBreakdown = [], notes = "" } = req.body;
 
-  if (!amount || !description || !timeline) {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount < 0 || !description || !timeline) {
     throw new AppError("Amount, description, and timeline are required", 400);
   }
 
@@ -117,7 +118,7 @@ export const sendQuotation = asyncHandler(async (req: Request, res: Response) =>
   if (!request) throw new AppError("Request not found", 404);
 
   request.quotation = {
-    amount,
+    amount: numericAmount,
     currency,
     description,
     pricingBreakdown,
@@ -136,7 +137,7 @@ export const sendQuotation = asyncHandler(async (req: Request, res: Response) =>
     action: "quotation-sent",
     targetModel: "CustomRequest",
     targetId: request._id,
-    description: `Sent quotation for request: ${request.projectTitle} - Amount: ${amount} ${currency}`
+    description: `Sent quotation for request: ${request.projectTitle} - Amount: ${numericAmount} ${currency}`
   });
 
   res.status(200).json(apiResponse(true, "Quotation sent successfully", request));

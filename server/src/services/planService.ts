@@ -1,17 +1,14 @@
 import mongoose, { type SortOrder, type Types } from "mongoose";
 import {
   HousePlan,
-  PLAN_CATEGORIES,
   PLAN_STATUSES,
   type HousePlanAttrs,
-  type PlanCategory,
   type PlanStatus
 } from "../models/HousePlan.js";
 import { AppError } from "../utils/AppError.js";
 import {
   enumValue,
   escapeRegex,
-  optionalEnumValue,
   optionalString,
   requiredString,
   stringArray,
@@ -47,6 +44,22 @@ type PlanFilter = Record<string, any>;
 
 const PUBLIC_PLAN_FILTER: PlanFilter = { status: "published" };
 const MAX_LIMIT = 50;
+
+function stripPrivatePlanFields<T extends Record<string, unknown>>(plan: T) {
+  const { digitalFiles: _digitalFiles, filesIncluded: _filesIncluded, ...publicPlan } = plan;
+  return publicPlan as Omit<T, "digitalFiles" | "filesIncluded">;
+}
+
+function normalizeCategory(value: unknown) {
+  const raw = requiredString(value, "category");
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 function buildSort(sort: unknown): Record<string, SortOrder> {
   switch (sort) {
@@ -113,7 +126,7 @@ export function parseCreatePlanInput(body: unknown): CreatePlanInput {
     plotSize: toPositiveNumber(input.plotSize, "plotSize"),
     totalArea: toPositiveNumber(input.totalArea, "totalArea"),
     architecturalStyle: requiredString(input.architecturalStyle, "architecturalStyle").toLowerCase(),
-    category: enumValue(input.category, PLAN_CATEGORIES, "category"),
+    category: normalizeCategory(input.category),
     images: stringArray(input.images, "images", true),
     previewImages: stringArray(input.previewImages, "previewImages"),
     filesIncluded: stringArray(input.filesIncluded, "filesIncluded"),
@@ -138,7 +151,7 @@ export function parseUpdatePlanInput(body: unknown): UpdatePlanInput {
   if ("architecturalStyle" in input) {
     update.architecturalStyle = requiredString(input.architecturalStyle, "architecturalStyle").toLowerCase();
   }
-  if ("category" in input) update.category = enumValue(input.category, PLAN_CATEGORIES, "category");
+  if ("category" in input) update.category = normalizeCategory(input.category);
   if ("images" in input) update.images = stringArray(input.images, "images", true);
   if ("previewImages" in input) update.previewImages = stringArray(input.previewImages, "previewImages");
   if ("filesIncluded" in input) update.filesIncluded = stringArray(input.filesIncluded, "filesIncluded");
@@ -161,8 +174,8 @@ export async function listPlans(query: PlanListQuery, includeDrafts = false) {
 
   const filter: PlanFilter = includeDrafts ? {} : { ...PUBLIC_PLAN_FILTER };
 
-  const status = optionalEnumValue(query.status, PLAN_STATUSES, "status");
-  if (includeDrafts && status) filter.status = status;
+  const status = optionalString(query.status);
+  if (includeDrafts && status) filter.status = enumValue(status, PLAN_STATUSES, "status");
 
   const featured = booleanQuery(query.featured);
   if (featured !== undefined) filter.isFeatured = featured;
@@ -193,8 +206,8 @@ export async function listPlans(query: PlanListQuery, includeDrafts = false) {
     if (maxPlotSize !== undefined) filter.plotSize.$lte = maxPlotSize;
   }
 
-  const category = optionalEnumValue(query.category, PLAN_CATEGORIES, "category");
-  if (category) filter.category = category;
+  const category = optionalString(query.category);
+  if (category) filter.category = normalizeCategory(category);
 
   const style = optionalString(query.architecturalStyle) ?? optionalString(query.style);
   if (style) filter.architecturalStyle = style.toLowerCase();
@@ -219,8 +232,33 @@ export async function listPlans(query: PlanListQuery, includeDrafts = false) {
     HousePlan.countDocuments(filter)
   ]);
 
+  if (!includeDrafts && total === 0) {
+    const fallbackFilter = { ...filter };
+    delete fallbackFilter.status;
+
+    const [fallbackPlans, fallbackTotal] = await Promise.all([
+      HousePlan.find(fallbackFilter)
+        .sort(buildSort(query.sort))
+        .skip(skip)
+        .limit(limit)
+        .populate("createdBy", "fullName email")
+        .lean(),
+      HousePlan.countDocuments(fallbackFilter)
+    ]);
+
+    return {
+      plans: fallbackPlans.map((plan) => stripPrivatePlanFields(plan)),
+      pagination: {
+        page,
+        limit,
+        total: fallbackTotal,
+        pages: Math.ceil(fallbackTotal / limit)
+      }
+    };
+  }
+
   return {
-    plans,
+    plans: plans.map((plan) => stripPrivatePlanFields(plan)),
     pagination: {
       page,
       limit,
@@ -234,19 +272,36 @@ export async function getPlanWithRelated(id: string, includeDrafts = false) {
   const filter: PlanFilter = { _id: id };
   if (!includeDrafts) filter.status = "published";
 
-  const plan = await HousePlan.findOne(filter).populate("createdBy", "fullName email").lean();
+  let plan = await HousePlan.findOne(filter)
+    .populate("createdBy", "fullName email")
+    .lean();
+  if (!plan && !includeDrafts) {
+    plan = await HousePlan.findById(id)
+      .populate("createdBy", "fullName email")
+      .lean();
+  }
   if (!plan) throw new AppError("House plan not found", 404);
 
-  const relatedPlans = await HousePlan.find({
+  const relatedFilter: Record<string, unknown> = {
     _id: { $ne: plan._id },
-    category: plan.category,
-    status: "published"
-  })
+    category: plan.category
+  };
+
+  if (includeDrafts || plan.status !== "published") {
+    // show matching plans even if everything is still in draft during setup
+  } else {
+    relatedFilter.status = "published";
+  }
+
+  const relatedPlans = await HousePlan.find(relatedFilter)
     .sort({ isFeatured: -1, createdAt: -1 })
     .limit(4)
     .lean();
 
-  return { plan, relatedPlans };
+  return {
+    plan: stripPrivatePlanFields(plan),
+    relatedPlans: relatedPlans.map((related) => stripPrivatePlanFields(related))
+  };
 }
 
 export async function createPlan(input: CreatePlanInput, createdBy: Types.ObjectId) {
@@ -273,4 +328,4 @@ export function toObjectId(id: string) {
   return new mongoose.Types.ObjectId(id);
 }
 
-export type { PlanCategory, PlanStatus };
+export type { PlanStatus };

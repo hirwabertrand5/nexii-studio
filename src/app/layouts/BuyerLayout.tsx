@@ -6,7 +6,7 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 export default function BuyerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
@@ -54,6 +54,11 @@ export default function BuyerLayout() {
           {/* Sidebar */}
           <aside className="col-span-12 md:col-span-3">
             <div className="bg-white rounded-lg border border-border p-4">
+              <div className="mb-4 rounded-lg bg-muted p-4">
+                <p className="text-sm text-muted-foreground">Signed in as</p>
+                <p className="font-semibold">{user?.fullName}</p>
+                <p className="text-xs text-muted-foreground break-all">{user?.email}</p>
+              </div>
               <nav className="space-y-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "../types";
-import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify, apiGoogleLogin } from "../api/authApi";
+import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify, apiGoogleLogin, apiUpdateMe, apiAdminLogin } from "../api/authApi";
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 
 type AuthState = {
@@ -8,10 +8,12 @@ type AuthState = {
   isLoading: boolean;
   isAuthenticated: boolean;
   login(input: { email: string }): Promise<AuthUser>;
+  adminLogin(input: { email: string; password: string }): Promise<AuthUser>;
   googleLogin(token: string): Promise<AuthUser>;
-  register(input: { fullName: string; email: string }): Promise<AuthUser>;
+  register(input: { fullName: string; email: string; country?: string }): Promise<AuthUser>;
+  updateProfile(input: { fullName?: string; country?: string | null; avatarUrl?: string | null }): Promise<AuthUser>;
   logout(): Promise<void>;
-  refresh(): Promise<void>;
+  refresh(): Promise<AuthUser | null>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = async () => {
     const res = await apiMe();
     setUser(res.user);
+    return res.user;
   };
 
   useEffect(() => {
@@ -45,9 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: Boolean(user),
       async googleLogin(token: string) {
         // send token to server for verification; server will set cookies
-        await apiGoogleLogin(token);
-        await refresh();
-        return user as AuthUser;
+        const res = await apiGoogleLogin(token);
+        setUser(res.user);
+        return res.user;
       },
       async login(input) {
         // Step 1: ask server for challenge
@@ -59,22 +62,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const assertion = await startAuthentication(options);
 
         // Step 3: verify with server (server will set cookies)
-        await apiLoginVerify({ ...assertion, id: userId });
+        const res = await apiLoginVerify({ ...assertion, id: userId });
 
         // Step 4: refresh user state
-        await refresh();
-        return user as AuthUser;
+        setUser(res.user);
+        return res.user;
+      },
+      async adminLogin(input) {
+        const res = await apiAdminLogin(input);
+        setUser(res.user);
+        return res.user;
       },
       async register(input) {
-        const challengeRes = await apiRegisterChallenge({ fullName: input.fullName, email: input.email });
+        const challengeRes = await apiRegisterChallenge({ fullName: input.fullName, email: input.email, country: input.country });
         const options = challengeRes.options;
         const userId = challengeRes.userId;
 
         const attestation = await startRegistration(options);
-        await apiRegisterVerify({ ...attestation, id: userId });
+        const res = await apiRegisterVerify({ ...attestation, id: userId });
 
-        await refresh();
-        return user as AuthUser;
+        setUser(res.user);
+        return res.user;
+      },
+      async updateProfile(input) {
+        const res = await apiUpdateMe(input);
+        setUser(res.user);
+        return res.user;
       },
       async logout() {
         try {
@@ -96,4 +109,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
-

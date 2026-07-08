@@ -1,60 +1,162 @@
-import { Link } from 'react-router';
-import { Search, Building2, FileText, Download, Star, CheckCircle, Home as HomeIcon, Package as PackageIcon, MapPin as MapPinIcon } from 'lucide-react';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Card, CardContent } from '@/shared/ui/card';
-import { ImageWithFallback } from '@/shared/components/ImageWithFallback';
-import { housePlans, categories } from '@/shared/data/mockData';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
+import {
+  Search,
+  Building2,
+  FileText,
+  Download,
+  Star,
+  CheckCircle,
+  Home as HomeIcon,
+  Package as PackageIcon,
+  MapPin as MapPinIcon,
+  Loader2
+} from "lucide-react";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Card, CardContent } from "@/shared/ui/card";
+import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
+import {
+  collectPlanCategories,
+  formatPlanCategoryLabel,
+  publicPlansApi,
+  resolvePlanImageUrl,
+  type PublicPlanSummary
+} from "@/features/public/api/plansApi";
+
+const categoryIcons: Record<string, any> = {
+  "Bungalow": HomeIcon,
+  "Duplex": Building2,
+  "Modern Villa": PackageIcon,
+  "Small Plot Home": MapPinIcon,
+  "African Contemporary": Star,
+};
+
+const HERO_BACKGROUND =
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1920&q=80";
+
+function formatUsd(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function PlanCard({ plan }: { plan: PublicPlanSummary }) {
+  const imageSrc = resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0]);
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="aspect-[4/3] bg-muted">
+        <ImageWithFallback
+          src={imageSrc}
+          alt={plan.title}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <CardContent className="p-6">
+        <div className="mb-2">
+          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
+            {formatPlanCategoryLabel(plan.category)}
+          </span>
+        </div>
+        <h3 className="text-xl mb-2">{plan.title}</h3>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+          <span>{plan.bedrooms} Beds</span>
+          <span>•</span>
+          <span>{plan.bathrooms} Baths</span>
+          <span>•</span>
+          <span>{plan.totalArea}m²</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-2xl font-bold text-primary">
+              {formatUsd(plan.price)}
+            </p>
+          </div>
+          <Link to={`/plan/${plan._id}`}>
+            <Button>View Plan</Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Home() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [plans, setPlans] = useState<PublicPlanSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadPlans = async () => {
+      try {
+        setLoading(true);
+        const response = await publicPlansApi.getPlans({ limit: 50, sort: "latest" });
+        if (!alive) return;
+        setPlans(response.plans ?? []);
+      } catch (err) {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : "Failed to load plans");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    loadPlans();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const latestPlans = useMemo(() => {
+    return [...plans]
+      .sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 6);
+  }, [plans]);
+
+  const randomPopularPlans = useMemo(() => {
+    const shuffled = [...plans].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 6);
+  }, [plans]);
+
+  const visibleFeaturedPlans = latestPlans;
+  const visibleBestPlans = randomPopularPlans.length > 0 ? randomPopularPlans : latestPlans;
+  const categories = useMemo(() => collectPlanCategories(plans), [plans]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     window.location.href = `/catalog?search=${encodeURIComponent(searchQuery)}`;
   };
 
-  const featuredPlans = housePlans.slice(0, 3);
-  const bestSelling = housePlans.slice(0, 6);
-  const mainCategories = categories.filter(c => c !== 'All Plans');
-
-  const categoryIcons: Record<string, any> = {
-    'Bungalow': HomeIcon,
-    'Duplex': Building2,
-    'Modern Villa': PackageIcon,
-    'Small Plot Homes': MapPinIcon,
-    'African Contemporary': Star,
-  };
-
-  // US Dollar (USD) formatter
-  const formatUsd = (amount: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount);
-
   return (
     <div>
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary via-accent to-primary text-white py-24">
-        <div className="absolute inset-0 opacity-10">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-slate-900 text-white py-24">
+        <div className="absolute inset-0">
           <ImageWithFallback
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1920&q=80"
+            src={HERO_BACKGROUND}
             alt="Modern architecture"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
           />
         </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-primary/40 to-slate-950/70" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-6xl mb-6">
             Find Your Ideal House Plan
           </h1>
           <p className="text-xl md:text-2xl mb-12 text-white/90 max-w-3xl mx-auto">
-            Premium architectural designs for the global market. Browse ready-made plans or request custom designs.
+            Premium architectural designs for the global market. Browse live published plans or request custom designs.
           </p>
 
-          {/* Search Bar */}
           <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
             <div className="flex gap-2 bg-white rounded-lg p-2">
               <Input
@@ -73,49 +175,35 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Plans */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl mb-4">Featured House Plans</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Discover our most popular architectural designs
+              Discover our most popular live architectural designs
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredPlans.map((plan) => (
-              <Card key={plan.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-[4/3] bg-muted">
-                  <ImageWithFallback
-                    src={`https://images.unsplash.com/photo-${plan.image === 'modern-villa-african' ? '1600585154340-be6161a56a0c' : plan.image === 'compact-bungalow' ? '1600607687939-ce8a6c25118c' : '1600566753190-17f0baa2a6c3'}?w=800&q=80`}
-                    alt={plan.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-xl mb-2">{plan.name}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <span>{plan.bedrooms} Beds</span>
-                    <span>•</span>
-                    <span>{plan.bathrooms} Baths</span>
-                    <span>•</span>
-                    <span>{plan.area}m²</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-2xl font-bold text-primary">
-                        {formatUsd(plan.price)}
-                      </p>
-                    </div>
-                    <Link to={`/plan/${plan.id}`}>
-                      <Button>View Plan</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading published plans...
+            </div>
+          ) : error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center text-red-700">
+              {error}
+            </div>
+          ) : visibleFeaturedPlans.length === 0 ? (
+            <div className="rounded-lg border border-border bg-muted p-8 text-center text-muted-foreground">
+              No published plans yet. Once an admin publishes a plan, it will appear here automatically.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {visibleFeaturedPlans.map((plan) => (
+                <PlanCard key={plan._id} plan={plan} />
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link to="/catalog">
@@ -127,7 +215,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories */}
       <section className="py-16 bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -138,14 +225,18 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {mainCategories.map((category) => {
-              const Icon = categoryIcons[category] ?? Building2;
+            {categories.map((category) => {
+              const Icon = categoryIcons[category.label] ?? Building2;
+
               return (
-                <Link key={category} to={`/catalog?category=${encodeURIComponent(category)}`}>
+                <Link key={category.value} to={`/catalog?category=${encodeURIComponent(category.value)}`}>
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                     <CardContent className="p-6 text-center">
                       <Icon className="w-12 h-12 mx-auto mb-3 text-primary" />
-                      <h4>{category}</h4>
+                      <h4>{category.label}</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {category.count} live plan{category.count === 1 ? "" : "s"}
+                      </p>
                     </CardContent>
                   </Card>
                 </Link>
@@ -155,49 +246,31 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Best Selling Plans (inserted between Categories and Why Choose NEXii) */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl mb-4">Best Selling Plans</h2>
+            <h2 className="text-3xl md:text-4xl mb-4">Popular Plans</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our most purchased and loved house plans — popular with homeowners worldwide
+              Freshly published plans available right now on the platform
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {bestSelling.map((plan) => (
-              <Card key={plan.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-[4/3] bg-muted">
-                  <ImageWithFallback
-                    src={`https://images.unsplash.com/photo-${plan.image === 'modern-villa-african' ? '1600585154340-be6161a56a0c' : plan.image === 'compact-bungalow' ? '1600607687939-ce8a6c25118c' : plan.image === 'luxury-duplex' ? '1600566753190-17f0baa2a6c3' : plan.image === 'small-plot-home' ? '1507089947368-19c1da9775ae' : plan.image === 'contemporary-family' ? '1505691723518-36a7b6a1ec1a' : '1493809842364-78817add7ffb'}?w=800&q=80`}
-                    alt={plan.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-xl mb-2">{plan.name}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <span>{plan.bedrooms} Beds</span>
-                    <span>•</span>
-                    <span>{plan.bathrooms} Baths</span>
-                    <span>•</span>
-                    <span>{plan.area}m²</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-2xl font-bold text-primary">
-                        {formatUsd(plan.price)}
-                      </p>
-                    </div>
-                    <Link to={`/plan/${plan.id}`}>
-                      <Button>View Plan</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading live catalog...
+            </div>
+          ) : visibleBestPlans.length === 0 ? (
+            <div className="rounded-lg border border-border bg-muted p-8 text-center text-muted-foreground">
+              No live plans available yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {visibleBestPlans.map((plan) => (
+                <PlanCard key={plan._id} plan={plan} />
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link to="/catalog">
@@ -209,14 +282,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Why Choose NEXii */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl mb-4">Why Choose NEXii</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Premium architectural services designed for the global market
-              </p>
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -255,140 +327,6 @@ export default function Home() {
                 </p>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section id="how-it-works" className="py-16 bg-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl mb-4">How It Works</h2>
-            <p className="text-muted-foreground">
-              Get your dream house plan in 3 simple steps
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">
-                1
-              </div>
-              <h3 className="text-xl mb-3">Browse Plans</h3>
-              <p className="text-muted-foreground">
-                Explore our catalog of professionally designed house plans or request a custom design
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-20 h-20 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">
-                2
-              </div>
-              <h3 className="text-xl mb-3">Purchase</h3>
-              <p className="text-muted-foreground">
-                Secure checkout with African payment methods including Mobile Money and bank transfer
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-20 h-20 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">
-                3
-              </div>
-              <h3 className="text-xl mb-3">Download Plans</h3>
-              <p className="text-muted-foreground">
-                Instantly access complete architectural, structural, and CAD drawings
-              </p>
-            </div>
-          </div>
-
-          <div className="text-center mt-12">
-            <Link to="/register">
-              <Button size="lg">Get Started Now</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl mb-4">What Our Clients Say</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "Excellent service! The plans were detailed and perfect for my plot in Kigali. Very professional."
-                </p>
-                <div>
-                  <p className="font-semibold">Jean Claude N.</p>
-                  <p className="text-sm text-muted-foreground">Kigali, Rwanda</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "The custom design service was outstanding. They understood exactly what I wanted for my family home."
-                </p>
-                <div>
-                  <p className="font-semibold">Aline Mukamana</p>
-                  <p className="text-sm text-muted-foreground">Musanze, Rwanda</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "Great value for money. The plans are comprehensive and saved me thousands in architect fees."
-                </p>
-                <div>
-                  <p className="font-semibold">Eric Habimana</p>
-                  <p className="text-sm text-muted-foreground">Huye, Rwanda</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 bg-primary text-primary-foreground">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl mb-4">Ready to Build Your Dream Home?</h2>
-          <p className="text-xl mb-8 text-primary-foreground/90">
-            Start browsing our catalog or request a custom design today
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/catalog">
-              <Button size="lg" variant="secondary">
-                Browse Plans
-              </Button>
-            </Link>
-            <Link to="/custom-design">
-              <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-primary">
-                Request Custom Design
-              </Button>
-            </Link>
           </div>
         </div>
       </section>

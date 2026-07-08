@@ -1,4 +1,9 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+const fallbackApiUrl =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:5000`
+    : "http://127.0.0.1:5000";
+
+const API_URL = import.meta.env.VITE_API_URL ?? fallbackApiUrl;
 
 export class HttpError extends Error {
   status: number;
@@ -11,14 +16,18 @@ export class HttpError extends Error {
 }
 
 export async function http<T>(path: string, options?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
+  const headers = new Headers(options?.headers ?? {});
+
+  if (!isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     // rely on HTTP-only cookies for auth; include credentials so browser sends cookies
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {})
-    }
+    headers
   });
 
   const isJson = res.headers.get("content-type")?.includes("application/json");

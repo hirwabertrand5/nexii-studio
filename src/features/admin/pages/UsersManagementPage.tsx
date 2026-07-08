@@ -1,54 +1,40 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/shared/ui/card';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Badge } from '@/shared/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/shared/ui/table';
-import { Search, Ban, CheckCircle, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { adminUsersApi } from '../api/adminApi';
-
-interface User {
-  _id: string;
-  fullName: string;
-  email: string;
-  country?: string;
-  accountStatus: 'active' | 'suspended';
-  createdAt: string;
-}
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/shared/ui/table";
+import { Search, Ban, CheckCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { adminUsersApi, type AdminUserStatistics, type AdminUserSummary } from "../api/adminApi";
 
 export default function UsersManagement() {
-  const [userList, setUserList] = useState<User[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [userList, setUserList] = useState<AdminUserSummary[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminUserStatistics | null>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
         const [usersRes, statsRes] = await Promise.all([
-          adminUsersApi.getAllUsers({ limit: 100, role: 'buyer' }),
+          adminUsersApi.getAllUsers({ limit: 100, role: "buyer" }),
           adminUsersApi.getUserStatistics()
         ]);
-        
-        if (usersRes.success) {
-          setUserList(usersRes.data.users);
-        }
-        if (statsRes.success) {
-          setStats(statsRes.data);
-        }
+
+        setUserList(usersRes.users);
+        setStats(statsRes);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch users');
-        toast.error('Failed to load users');
+        setError(err instanceof Error ? err.message : "Failed to fetch users");
+        toast.error("Failed to load users");
       } finally {
         setLoading(false);
       }
@@ -57,29 +43,31 @@ export default function UsersManagement() {
     fetchUsers();
   }, []);
 
-  const filteredUsers = userList.filter(user =>
+  const filteredUsers = userList.filter((user) =>
     user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user.country && user.country.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleToggleStatus = async (userId: string, currentStatus: 'active' | 'suspended') => {
+  const handleToggleStatus = async (userId: string, currentStatus: AdminUserSummary["accountStatus"]) => {
     try {
-      if (currentStatus === 'active') {
+      if (currentStatus === "active") {
         await adminUsersApi.suspendUser(userId);
-        toast.success('User suspended');
+        toast.success("User suspended");
       } else {
         await adminUsersApi.activateUser(userId);
-        toast.success('User activated');
+        toast.success("User activated");
       }
-      
-      setUserList(userList.map(user => 
-        user._id === userId 
-          ? { ...user, accountStatus: currentStatus === 'active' ? 'suspended' : 'active' }
-          : user
-      ));
-    } catch (err) {
-      toast.error('Failed to update user status');
+
+      setUserList((prev) =>
+        prev.map((user) =>
+          user._id === userId
+            ? { ...user, accountStatus: currentStatus === "active" ? "suspended" : "active" }
+            : user
+        )
+      );
+    } catch {
+      toast.error("Failed to update user status");
     }
   };
 
@@ -103,12 +91,9 @@ export default function UsersManagement() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl mb-2">Users Management</h1>
-        <p className="text-muted-foreground">
-          {filteredUsers.length} users displayed
-        </p>
+        <p className="text-muted-foreground">{filteredUsers.length} users displayed</p>
       </div>
 
-      {/* Search */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="relative">
@@ -124,12 +109,12 @@ export default function UsersManagement() {
         </CardContent>
       </Card>
 
-      {/* Users Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>#</TableHead>
                 <TableHead>User ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
@@ -141,36 +126,39 @@ export default function UsersManagement() {
             </TableHeader>
             <TableBody>
               {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
+                filteredUsers.map((user, index) => (
                   <TableRow key={user._id}>
+                    <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                     <TableCell className="font-mono text-sm">{user._id.slice(0, 8)}...</TableCell>
                     <TableCell className="font-semibold">{user.fullName}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.country || '-'}</TableCell>
+                    <TableCell>{user.country || "-"}</TableCell>
                     <TableCell>
-                      {new Date(user.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
+                      {new Date(user.createdAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric"
                       })}
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        user.accountStatus === 'active' 
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          user.accountStatus === "active"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
                         {user.accountStatus.charAt(0).toUpperCase() + user.accountStatus.slice(1)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant={user.accountStatus === 'active' ? 'ghost' : 'default'}
+                        <Button
+                          variant={user.accountStatus === "active" ? "ghost" : "default"}
                           size="sm"
                           onClick={() => handleToggleStatus(user._id, user.accountStatus)}
                         >
-                          {user.accountStatus === 'active' ? (
+                          {user.accountStatus === "active" ? (
                             <>
                               <Ban className="w-4 h-4 mr-1" />
                               Suspend
@@ -188,7 +176,7 @@ export default function UsersManagement() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -198,7 +186,6 @@ export default function UsersManagement() {
         </CardContent>
       </Card>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <Card>
           <CardContent className="p-6">
@@ -210,18 +197,14 @@ export default function UsersManagement() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Active Users</p>
-            <p className="text-2xl font-bold">
-              {stats?.activeUsers ?? 0}
-            </p>
+            <p className="text-2xl font-bold">{stats?.activeUsers ?? 0}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Suspended Users</p>
-            <p className="text-2xl font-bold">
-              {userList.reduce((sum, user) => sum + user.totalPurchases, 0)}
-            </p>
+            <p className="text-2xl font-bold">{stats?.suspendedUsers ?? 0}</p>
           </CardContent>
         </Card>
       </div>

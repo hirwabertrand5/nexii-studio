@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
+import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { generateAccessToken, createRefreshToken, verifyRefreshToken, revokeRefreshToken } from "../utils/generateToken.js";
 import { sendMessage, sendSuccess } from "../utils/apiResponse.js";
@@ -31,13 +32,16 @@ function getOrigin(req: Request) {
 }
 
 export async function registerChallenge(req: Request, res: Response) {
-  const { fullName, email } = req.body ?? {};
+  const { fullName, email, country } = req.body ?? {};
   if (!fullName || !email) return res.status(400).json({ success: false, message: "fullName and email are required" });
 
   const emailLc = String(email).toLowerCase();
   let user = await User.findOne({ email: emailLc });
   if (!user) {
-    user = await User.create({ fullName: String(fullName), email: emailLc });
+    user = await User.create({ fullName: String(fullName), email: emailLc, country: country ? String(country) : undefined });
+  } else if (country && !user.country) {
+    user.country = String(country);
+    await user.save();
   }
 
   const rpID = getRpId(req);
@@ -241,6 +245,90 @@ export async function me(req: Request, res: Response) {
   if (!req.auth) return res.status(401).json({ success: false, message: "Unauthorized" });
   const user = await User.findById(req.auth.userId);
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  return sendSuccess(res, { user: sanitizeUser(user) });
+}
+
+export async function adminLogin(req: Request, res: Response) {
+  const { email, password } = req.body ?? {};
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "email and password are required" });
+  }
+
+  const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
+  if (!user) {
+    return res.status(401).json({ success: false, message: "Invalid email or password" });
+  }
+
+  if (user.role !== "admin") {
+    return res.status(403).json({ success: false, message: "Admin access required" });
+  }
+
+  if (user.accountStatus !== "active") {
+    return res.status(403).json({ success: false, message: "Admin account is suspended" });
+  }
+
+  if (!user.password) {
+    return res.status(400).json({ success: false, message: "Admin password is not configured" });
+  }
+
+  const passwordMatches = await bcrypt.compare(String(password), user.password);
+  if (!passwordMatches) {
+    return res.status(401).json({ success: false, message: "Invalid email or password" });
+  }
+
+  const access = generateAccessToken({ userId: String(user._id), role: user.role });
+  const refreshRaw = await createRefreshToken(String(user._id), req.ip, String(req.headers["user-agent"] ?? ""));
+
+  const accessMaxAge = 15 * 60 * 1000;
+  const refreshMaxAge = 7 * 24 * 60 * 60 * 1000;
+
+  res.cookie("access_token", access, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: accessMaxAge
+  });
+
+  res.cookie("refresh_token", refreshRaw, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: refreshMaxAge
+  });
+
+  return sendSuccess(res, { user: sanitizeUser(user) });
+}
+
+export async function updateMe(req: Request, res: Response) {
+  if (!req.auth) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  const user = await User.findById(req.auth.userId);
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+  const { fullName, country, avatarUrl } = req.body ?? {};
+
+  if (fullName !== undefined) {
+    const nextFullName = String(fullName).trim();
+    if (!nextFullName) {
+      return res.status(400).json({ success: false, message: "fullName cannot be empty" });
+    }
+    user.fullName = nextFullName;
+  }
+
+  if (country !== undefined) {
+    const nextCountry = country === null ? "" : String(country).trim();
+    user.country = nextCountry || undefined;
+  }
+
+  if (avatarUrl !== undefined) {
+    const nextAvatarUrl = avatarUrl === null ? "" : String(avatarUrl).trim();
+    user.avatarUrl = nextAvatarUrl || undefined;
+  }
+
+  await user.save();
+
   return sendSuccess(res, { user: sanitizeUser(user) });
 }
 

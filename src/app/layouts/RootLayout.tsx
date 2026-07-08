@@ -1,11 +1,21 @@
-import { Outlet, Link, useLocation } from 'react-router';
-import { Building2, ShoppingCart, User } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
+import { Building2, CircleUserRound, LogOut } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import logo from "@/assets/logo.png";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export default function RootLayout() {
   const location = useLocation();
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuth();
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/admin/login';
+  const accountHref = user?.role === "admin" ? "/admin" : "/dashboard";
+  const accountLabel = user?.role === "admin" ? "Admin Panel" : "Dashboard";
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
 
   if (isAuthPage) {
     return <Outlet />;
@@ -47,17 +57,32 @@ export default function RootLayout() {
 
             {/* Auth Buttons */}
             <div className="flex items-center gap-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="icon">
-                  <User className="w-5 h-5" />
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button variant="outline">Login</Button>
-              </Link>
-              <Link to="/register">
-                <Button>Get Started</Button>
-              </Link>
+              {isAuthenticated && user ? (
+                <>
+                  <div className="hidden lg:flex items-center gap-3 rounded-full border border-border px-3 py-1.5 bg-muted/50">
+                    <CircleUserRound className="w-5 h-5 text-primary" />
+                    <div className="leading-tight">
+                      <p className="text-sm font-medium">{user.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <Link to={accountHref}>
+                    <Button variant="outline">{accountLabel}</Button>
+                  </Link>
+                  <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
+                    <LogOut className="w-5 h-5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login">
+                    <Button variant="outline">Login</Button>
+                  </Link>
+                  <Link to="/register">
+                    <Button>Get Started</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -110,7 +135,7 @@ export default function RootLayout() {
               <h4 className="font-semibold mb-4">Contact</h4>
               <ul className="space-y-2 text-sm">
                 <li>Email: info@nexii.com</li>
-                <li>Phone: +234 800 000 0000</li>
+                <li>Phone: +250 796066681</li>
                 <li>Address: Lagos, Nigeria</li>
               </ul>
             </div>

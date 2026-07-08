@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  createPlan,
   getAllPlans,
   getPlanById,
   updatePlan,
@@ -11,11 +12,22 @@ import {
 } from "../controllers/adminPlanController.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 import { authenticate } from "../middleware/authMiddleware.js";
+import { uploadMiddleware } from "../middleware/uploadMiddleware.js";
 
 const router = Router();
 
 // Admin plan routes - Protected
 router.use(authenticate, adminMiddleware);
+
+// Create plan
+router.post(
+  "/",
+  uploadMiddleware.fields([
+    { name: "images", maxCount: 5 },
+    { name: "digitalFiles", maxCount: 3 }
+  ]),
+  createPlan
+);
 
 // Get all plans
 router.get("/", getAllPlans);
@@ -24,7 +36,14 @@ router.get("/", getAllPlans);
 router.get("/:id", getPlanById);
 
 // Update plan
-router.put("/:id", updatePlan);
+router.put(
+  "/:id",
+  uploadMiddleware.fields([
+    { name: "images", maxCount: 5 },
+    { name: "digitalFiles", maxCount: 3 }
+  ]),
+  updatePlan
+);
 
 // Toggle featured status
 router.patch("/:id/featured", toggleFeaturedStatus);

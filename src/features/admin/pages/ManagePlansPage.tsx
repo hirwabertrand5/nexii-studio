@@ -1,37 +1,25 @@
-import { Link } from 'react-router';
-import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/shared/ui/card';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { ImageWithFallback } from '@/shared/components/ImageWithFallback';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/shared/ui/table';
-import { Plus, Search, Edit, Trash2, Eye, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { adminPlansApi } from '../api/adminApi';
-
-interface HousePlan {
-  _id: string;
-  title: string;
-  category: string;
-  bedrooms: number;
-  bathrooms: number;
-  totalArea: number;
-  price: number;
-  images: string[];
-  status: string;
-  isFeatured: boolean;
-}
+import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/shared/ui/table";
+import { Plus, Search, Edit, Trash2, Eye, Loader2, Star } from "lucide-react";
+import { toast } from "sonner";
+import { adminPlansApi, type AdminPlanSummary } from "../api/adminApi";
+import { formatPlanCategoryLabel, resolvePlanImageUrl } from "@/features/public/api/plansApi";
 
 export default function ManagePlans() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [plans, setPlans] = useState<HousePlan[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [plans, setPlans] = useState<AdminPlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,12 +28,10 @@ export default function ManagePlans() {
       try {
         setLoading(true);
         const response = await adminPlansApi.getAllPlans({ limit: 100 });
-        if (response.success) {
-          setPlans(response.data.plans);
-        }
+        setPlans(response.plans);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch plans');
-        toast.error('Failed to load plans');
+        setError(err instanceof Error ? err.message : "Failed to fetch plans");
+        toast.error("Failed to load plans");
       } finally {
         setLoading(false);
       }
@@ -54,7 +40,7 @@ export default function ManagePlans() {
     fetchPlans();
   }, []);
 
-  const filteredPlans = plans.filter(plan =>
+  const filteredPlans = plans.filter((plan) =>
     plan.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     plan.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -62,14 +48,32 @@ export default function ManagePlans() {
   const handleDelete = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
       try {
-        const response = await adminPlansApi.deletePlan(id);
-        if (response.success) {
-          setPlans(plans.filter(p => p._id !== id));
-          toast.success('Plan deleted successfully');
-        }
-      } catch (err) {
-        toast.error('Failed to delete plan');
+        await adminPlansApi.deletePlan(id);
+        setPlans((prev) => prev.filter((plan) => plan._id !== id));
+        toast.success("Plan deleted successfully");
+      } catch {
+        toast.error("Failed to delete plan");
       }
+    }
+  };
+
+  const handlePublish = async (id: string) => {
+    try {
+      const updatedPlan = await adminPlansApi.publishPlan(id);
+      setPlans((prev) => prev.map((plan) => (plan._id === id ? updatedPlan : plan)));
+      toast.success("Plan published successfully");
+    } catch {
+      toast.error("Failed to publish plan");
+    }
+  };
+
+  const handleToggleFeatured = async (id: string) => {
+    try {
+      const updatedPlan = await adminPlansApi.toggleFeatured(id);
+      setPlans((prev) => prev.map((plan) => (plan._id === id ? updatedPlan : plan)));
+      toast.success(updatedPlan.isFeatured ? "Plan marked as featured" : "Plan removed from featured");
+    } catch {
+      toast.error("Failed to update featured state");
     }
   };
 
@@ -94,9 +98,7 @@ export default function ManagePlans() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl mb-2">Manage House Plans</h1>
-          <p className="text-muted-foreground">
-            {filteredPlans.length} plans in catalog
-          </p>
+          <p className="text-muted-foreground">{filteredPlans.length} plans in catalog</p>
         </div>
         <Link to="/admin/plans/add">
           <Button>
@@ -106,7 +108,6 @@ export default function ManagePlans() {
         </Link>
       </div>
 
-      {/* Search */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="relative">
@@ -122,12 +123,12 @@ export default function ManagePlans() {
         </CardContent>
       </Card>
 
-      {/* Plans Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>#</TableHead>
                 <TableHead>Image</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Category</TableHead>
@@ -141,13 +142,14 @@ export default function ManagePlans() {
             </TableHeader>
             <TableBody>
               {filteredPlans.length > 0 ? (
-                filteredPlans.map((plan) => (
+                filteredPlans.map((plan, index) => (
                   <TableRow key={plan._id}>
+                    <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                     <TableCell>
                       <div className="w-16 h-12 bg-muted rounded overflow-hidden">
-                        {plan.images && plan.images[0] ? (
+                        {plan.images?.[0] ? (
                           <ImageWithFallback
-                            src={plan.images[0]}
+                            src={resolvePlanImageUrl(plan.images[0])}
                             alt={plan.title}
                             className="w-full h-full object-cover"
                           />
@@ -156,10 +158,19 @@ export default function ManagePlans() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold">{plan.title}</TableCell>
+                    <TableCell className="font-semibold">
+                      <div className="flex flex-col gap-1">
+                        <span>{plan.title}</span>
+                        {plan.isFeatured && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-xs">
-                        {plan.category}
+                        {formatPlanCategoryLabel(plan.category)}
                       </span>
                     </TableCell>
                     <TableCell>{plan.bedrooms}</TableCell>
@@ -167,27 +178,42 @@ export default function ManagePlans() {
                     <TableCell>{plan.totalArea}m²</TableCell>
                     <TableCell className="font-semibold">${plan.price.toLocaleString()}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        plan.status === 'published'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          plan.status === "published"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
+                      >
                         {plan.status}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" disabled>
-                          <Eye className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/plan/${plan._id}`} aria-label={`Preview ${plan.title}`}>
+                            <Eye className="w-4 h-4" />
+                          </Link>
                         </Button>
-                        <Button variant="ghost" size="sm" disabled>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(plan._id, plan.title)}
+                          onClick={() => handleToggleFeatured(plan._id)}
+                          title={plan.isFeatured ? "Remove featured" : "Mark as featured"}
                         >
+                          <Star className={`w-4 h-4 ${plan.isFeatured ? "fill-yellow-400 text-yellow-500" : ""}`} />
+                        </Button>
+                        {plan.status !== "published" && (
+                          <Button variant="ghost" size="sm" onClick={() => handlePublish(plan._id)} title="Publish plan">
+                            Publish
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/admin/plans/${plan._id}/edit`} aria-label={`Edit ${plan.title}`}>
+                            <Edit className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(plan._id, plan.title)}>
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -196,7 +222,7 @@ export default function ManagePlans() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     No plans found
                   </TableCell>
                 </TableRow>

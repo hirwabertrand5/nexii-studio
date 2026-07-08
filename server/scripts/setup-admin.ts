@@ -50,7 +50,7 @@ async function setupAdmin() {
    • Never share this password via email or chat
    • Delete this script after running it
 
-🔗 Login URL: https://your-production-domain.com/login
+🔗 Login URL: https://your-production-domain.com/admin/login
     `);
 
     // Log this action for audit trail

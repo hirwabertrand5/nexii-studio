@@ -10,7 +10,7 @@ export const PLAN_CATEGORIES = [
 
 export const PLAN_STATUSES = ["draft", "published"] as const;
 
-export type PlanCategory = (typeof PLAN_CATEGORIES)[number];
+export type PlanCategory = string;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
 export interface HousePlanAttrs {
@@ -52,7 +52,7 @@ const housePlanSchema = new Schema<HousePlanAttrs>(
     plotSize: { type: Number, required: true, min: 0 },
     totalArea: { type: Number, required: true, min: 0 },
     architecturalStyle: { type: String, required: true, trim: true, lowercase: true, index: true },
-    category: { type: String, required: true, enum: PLAN_CATEGORIES, index: true },
+    category: { type: String, required: true, trim: true, index: true },
     images: [{ type: String, required: true, trim: true }],
     previewImages: [{ type: String, trim: true }],
     filesIncluded: [{ type: String, trim: true }],

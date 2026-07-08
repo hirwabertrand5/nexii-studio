@@ -1,36 +1,25 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/shared/ui/card';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Badge } from '@/shared/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/shared/ui/table';
-import { Search, Eye, Download, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { adminPaymentsApi } from '../api/adminApi';
-
-interface Order {
-  _id: string;
-  user: { fullName: string; email: string };
-  plans: Array<{ title: string; price: number }>;
-  totalAmount: number;
-  paymentMethod: string;
-  paymentStatus: string;
-  orderStatus: string;
-  createdAt: string;
-  transactionReference: string;
-}
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
+import { Card, CardContent } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/shared/ui/table";
+import { Search, Eye, Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { adminPaymentsApi, type AdminOrderSummary } from "../api/adminApi";
 
 export default function OrdersManagement() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [orders, setOrders] = useState<Order[]>([]);
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [orders, setOrders] = useState<AdminOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,12 +28,10 @@ export default function OrdersManagement() {
       try {
         setLoading(true);
         const response = await adminPaymentsApi.getAllOrders({ limit: 100 });
-        if (response.success) {
-          setOrders(response.data.orders);
-        }
+        setOrders(response.orders);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch orders');
-        toast.error('Failed to load orders');
+        setError(err instanceof Error ? err.message : "Failed to fetch orders");
+        toast.error("Failed to load orders");
       } finally {
         setLoading(false);
       }
@@ -53,32 +40,30 @@ export default function OrdersManagement() {
     fetchOrders();
   }, []);
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch =
       order._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.plans[0]?.title.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || order.paymentStatus === statusFilter;
-    
+      (order.plans[0]?.title ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === "all" || order.paymentStatus === statusFilter;
+
     return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-700';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'failed':
-        return 'bg-red-100 text-red-700';
+      case "paid":
+        return "bg-green-100 text-green-700";
+      case "pending":
+        return "bg-yellow-100 text-yellow-700";
+      case "failed":
+        return "bg-red-100 text-red-700";
+      case "refunded":
+        return "bg-slate-100 text-slate-700";
       default:
-        return 'bg-gray-100 text-gray-700';
+        return "bg-gray-100 text-gray-700";
     }
-  };
-
-  const handleViewDetails = (orderId: string) => {
-    toast.info(`Viewing details for order ${orderId}`);
   };
 
   if (loading) {
@@ -98,19 +83,16 @@ export default function OrdersManagement() {
   }
 
   const totalRevenue = filteredOrders
-    .filter(o => o.paymentStatus === 'paid')
+    .filter((order) => order.paymentStatus === "paid")
     .reduce((sum, order) => sum + order.totalAmount, 0);
 
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-3xl mb-2">Orders Management</h1>
-        <p className="text-muted-foreground">
-          {filteredOrders.length} orders found
-        </p>
+        <p className="text-muted-foreground">{filteredOrders.length} orders found</p>
       </div>
 
-      {/* Filters */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
@@ -126,30 +108,30 @@ export default function OrdersManagement() {
             </div>
             <div className="flex gap-2">
               <Button
-                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                variant={statusFilter === "all" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter('all')}
+                onClick={() => setStatusFilter("all")}
               >
                 All
               </Button>
               <Button
-                variant={statusFilter === 'paid' ? 'default' : 'outline'}
+                variant={statusFilter === "paid" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter('paid')}
+                onClick={() => setStatusFilter("paid")}
               >
                 Paid
               </Button>
               <Button
-                variant={statusFilter === 'pending' ? 'default' : 'outline'}
+                variant={statusFilter === "pending" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter('pending')}
+                onClick={() => setStatusFilter("pending")}
               >
                 Pending
               </Button>
               <Button
-                variant={statusFilter === 'failed' ? 'default' : 'outline'}
+                variant={statusFilter === "failed" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter('failed')}
+                onClick={() => setStatusFilter("failed")}
               >
                 Failed
               </Button>
@@ -158,12 +140,12 @@ export default function OrdersManagement() {
         </CardContent>
       </Card>
 
-      {/* Orders Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>#</TableHead>
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Plan</TableHead>
@@ -176,8 +158,9 @@ export default function OrdersManagement() {
             </TableHeader>
             <TableBody>
               {filteredOrders.length > 0 ? (
-                filteredOrders.map((order) => (
+                filteredOrders.map((order, index) => (
                   <TableRow key={order._id}>
+                    <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                     <TableCell className="font-mono text-sm">{order._id.slice(0, 8)}...</TableCell>
                     <TableCell>
                       <div>
@@ -185,14 +168,14 @@ export default function OrdersManagement() {
                         <p className="text-xs text-muted-foreground">{order.user.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{order.plans[0]?.title || 'N/A'}</TableCell>
+                    <TableCell>{order.plans[0]?.title || "N/A"}</TableCell>
                     <TableCell className="font-semibold">${order.totalAmount.toLocaleString()}</TableCell>
                     <TableCell>{order.paymentMethod}</TableCell>
                     <TableCell>
-                      {new Date(order.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
+                      {new Date(order.createdAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric"
                       })}
                     </TableCell>
                     <TableCell>
@@ -202,18 +185,10 @@ export default function OrdersManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleViewDetails(order._id)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/orders/${order._id}`)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => toast.success('Downloading invoice...')}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => toast.success("Downloading invoice...")}>
                           <Download className="w-4 h-4" />
                         </Button>
                       </div>
@@ -222,7 +197,7 @@ export default function OrdersManagement() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     No orders found
                   </TableCell>
                 </TableRow>
@@ -232,32 +207,25 @@ export default function OrdersManagement() {
         </CardContent>
       </Card>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
-            <p className="text-2xl font-bold">
-              ${totalRevenue.toLocaleString()}
-            </p>
+            <p className="text-2xl font-bold">${totalRevenue.toLocaleString()}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Completed Orders</p>
-            <p className="text-2xl font-bold">
-              {orders.filter(o => o.orderStatus === 'completed').length}
-            </p>
+            <p className="text-2xl font-bold">{orders.filter((order) => order.orderStatus === "completed").length}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Pending Orders</p>
-            <p className="text-2xl font-bold">
-              {orders.filter(o => o.paymentStatus === 'pending').length}
-            </p>
+            <p className="text-2xl font-bold">{orders.filter((order) => order.paymentStatus === "pending").length}</p>
           </CardContent>
         </Card>
       </div>

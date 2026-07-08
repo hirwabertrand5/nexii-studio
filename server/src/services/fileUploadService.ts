@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "fs/promises";
+import path from "path";
 import stream from "stream";
 import { promisify } from "util";
 
@@ -25,9 +27,39 @@ const s3Client = new S3Client({
       : undefined
 });
 
+const localUploadRoot = path.resolve(process.cwd(), "..", "uploads");
+
+function getPublicBaseUrl() {
+  return (
+    process.env.PUBLIC_API_URL ||
+    process.env.BACKEND_URL ||
+    process.env.API_URL ||
+    `http://localhost:${process.env.PORT || 5000}`
+  ).replace(/\/$/, "");
+}
+
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
+
+async function uploadToLocal(buffer: Buffer, originalName: string, subdir = "requests") {
+  const safeName = `${Date.now()}-${sanitizeFileName(originalName)}`;
+  const relativePath = path.posix.join(subdir, safeName);
+  const absolutePath = path.join(localUploadRoot, relativePath);
+
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, buffer);
+
+  return {
+    key: relativePath.replace(/\\/g, "/"),
+    url: `/uploads/${relativePath.replace(/\\/g, "/")}`
+  };
+}
+
 export interface UploadedFileResult {
   fileName: string;
   storageKey: string;
+  url?: string;
   contentType?: string;
   sizeInBytes?: number;
   fileType: "sketch" | "document" | "inspiration" | "other";
@@ -77,6 +109,7 @@ export async function uploadBufferFile(
     return {
       fileName: originalName,
       storageKey: `cloudinary://${res.public_id}`,
+      url: res.secure_url,
       contentType: mimetype,
       sizeInBytes: res.bytes,
       fileType,
@@ -89,17 +122,28 @@ export async function uploadBufferFile(
     // Fallback: store to Cloudinary if available
     if (process.env.CLOUDINARY_CLOUD_NAME) {
       const res = await uploadToCloudinary(buffer, originalName);
-      return {
-        fileName: originalName,
-        storageKey: `cloudinary://${res.public_id}`,
-        contentType: mimetype,
-        sizeInBytes: res.bytes,
-        fileType,
-        uploadedAt: new Date()
+        return {
+          fileName: originalName,
+          storageKey: `cloudinary://${res.public_id}`,
+          url: res.secure_url,
+          contentType: mimetype,
+          sizeInBytes: res.bytes,
+          fileType,
+          uploadedAt: new Date()
       };
     }
 
-    throw new Error("No storage provider configured (S3 or Cloudinary)");
+    // Local dev fallback when external storage is not configured
+    const local = await uploadToLocal(buffer, originalName);
+    return {
+      fileName: originalName,
+      storageKey: `local://${local.key}`,
+      url: local.url,
+      contentType: mimetype,
+      sizeInBytes,
+      fileType,
+      uploadedAt: new Date()
+    };
   }
 
   // Build an S3 key including timestamp
@@ -109,6 +153,7 @@ export async function uploadBufferFile(
   return {
     fileName: originalName,
     storageKey: `s3://${s3res.key}`,
+    url: s3res.url,
     contentType: mimetype,
     sizeInBytes: sizeInBytes,
     fileType,

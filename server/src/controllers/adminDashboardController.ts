@@ -25,7 +25,7 @@ export const getDashboardOverview = asyncHandler(async (req: Request, res: Respo
       { $match: { paymentStatus: "paid" } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } }
     ]),
-    CustomRequest.countDocuments({ status: "pending" }),
+    CustomRequest.countDocuments({ status: { $nin: ["rejected", "completed"] } }),
     Order.countDocuments({ paymentStatus: "failed" })
   ]);
 
@@ -56,7 +56,7 @@ export const getRecentActivity = asyncHandler(async (req: Request, res: Response
       .limit(5)
       .select("fullName email country createdAt"),
     CustomRequest.find()
-      .populate("client", "fullName email")
+      .populate("user", "fullName email country")
       .sort({ createdAt: -1 })
       .limit(5),
     Order.find({ paymentStatus: "failed" })

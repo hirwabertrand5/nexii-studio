@@ -1,40 +1,86 @@
-import { useState } from 'react';
-import type { ComponentProps } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
-import { Button } from '@/shared/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
-import { Label } from '@/shared/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group';
-import { ImageWithFallback } from '@/shared/components/ImageWithFallback';
-import { housePlans } from '@/shared/data/mockData';
-import { ArrowLeft, CheckCircle, CreditCard, Smartphone, Building, Banknote } from 'lucide-react';
-import { toast } from 'sonner';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
-import { http } from '@/shared/api/http';
-import { useAuth } from '@/features/auth/context/AuthContext';
+import { useEffect, useMemo, useState } from "react";
+import type { ComponentProps } from "react";
+import { useParams, useNavigate, Link } from "react-router";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Label } from "@/shared/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
+import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
+import { ArrowLeft, CheckCircle, CreditCard, Smartphone, Building, Banknote, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { http } from "@/shared/api/http";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import {
+  formatPlanCategoryLabel,
+  publicPlansApi,
+  resolvePlanImageUrl,
+  type PublicPlanSummary
+} from "@/features/public/api/plansApi";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? '');
-type ElementsStripeProp = ComponentProps<typeof Elements>['stripe'];
+const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+type ElementsStripeProp = ComponentProps<typeof Elements>["stripe"];
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const plan = housePlans.find(p => p.id === id);
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [currency, setCurrency] = useState('USD');
+  const stripePromise = useMemo(() => (stripePublicKey ? loadStripe(stripePublicKey) : null), []);
+  const [plan, setPlan] = useState<PublicPlanSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [currency, setCurrency] = useState("USD");
   const [isProcessing, setIsProcessing] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [paypalLoading, setPaypalLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  if (!plan) {
+  useEffect(() => {
+    let alive = true;
+
+    const loadPlan = async () => {
+      if (!id) {
+        setError("Plan not found");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await publicPlansApi.getPlanById(id);
+        if (!alive) return;
+        setPlan(response.plan);
+      } catch (err) {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : "Failed to load plan");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    loadPlan();
+
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !plan) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl mb-4">Plan not found</h2>
+          <h2 className="text-2xl mb-4">{error || "Plan not found"}</h2>
           <Link to="/catalog">
             <Button>Back to Catalog</Button>
           </Link>
@@ -43,62 +89,59 @@ export default function Checkout() {
     );
   }
 
-  // Create an order on the backend (requires authentication)
   async function createOrderOnServer(method: string) {
-    const payload = await http('/api/orders/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ plans: [plan!.id], paymentMethod: method, currency })
+    const payload = await http("/api/orders/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plans: [plan._id], paymentMethod: method, currency })
     });
     const orderId = (payload as any)?.order?._id ?? (payload as any)?.order?.id;
-    if (!orderId) throw new Error('Order not created');
+    if (!orderId) throw new Error("Order not created");
     return orderId as string;
   }
 
-  // Stripe card form handler component (uses Elements context)
   function StripeCardForm({ existingOrderId }: { existingOrderId?: string }) {
     const stripe = useStripe();
     const elements = useElements();
     const [name, setName] = useState(user?.fullName ?? "");
-    const [loading, setLoadingLocal] = useState(false);
+    const [loadingLocal, setLoadingLocal] = useState(false);
 
     const CARD_OPTIONS = {
       style: {
-        base: { fontSize: '16px', color: '#0f172a', '::placeholder': { color: '#94a3b8' } },
-        invalid: { color: '#ef4444' }
+        base: { fontSize: "16px", color: "#0f172a", "::placeholder": { color: "#94a3b8" } },
+        invalid: { color: "#ef4444" }
       }
     };
 
     const handleStripePayment = async () => {
       setPaymentError(null);
       if (!stripe || !elements) {
-        setPaymentError('Payment system not ready');
+        setPaymentError("Payment system not ready");
         return;
       }
       setLoadingLocal(true);
       setStripeLoading(true);
       try {
-        const orderId = existingOrderId ?? (await createOrderOnServer('card'));
+        const orderId = existingOrderId ?? (await createOrderOnServer("card"));
 
-        const init = await http('/api/payments/stripe/create-intent', {
-          method: 'POST',
+        const init = await http("/api/payments/stripe/create-intent", {
+          method: "POST",
           body: JSON.stringify({ orderId })
         });
         const clientSecret = (init as any)?.payment?.clientSecret;
-        if (!clientSecret) throw new Error('Unable to initialize Stripe payment');
+        if (!clientSecret) throw new Error("Unable to initialize Stripe payment");
 
         const card = elements.getElement(CardElement);
-        if (!card) throw new Error('Card input not found');
+        if (!card) throw new Error("Card input not found");
 
         const result = await stripe.confirmCardPayment(clientSecret, {
           payment_method: { card, billing_details: { name: name || undefined, email: user?.email || undefined } }
         });
 
         if (result.error) {
-          throw new Error(result.error.message ?? 'Card was declined');
+          throw new Error(result.error.message ?? "Card was declined");
         }
 
-        // PaymentIntent succeeded or requires capture; navigate to success page and rely on webhook to finalize
-        toast.success('Payment successful');
+        toast.success("Payment successful");
         navigate(`/payment/success?gateway=stripe&orderId=${orderId}`);
       } catch (err) {
         const m = err instanceof Error ? err.message : String(err);
@@ -118,60 +161,56 @@ export default function Checkout() {
           <CardElement options={CARD_OPTIONS} />
         </div>
         {paymentError && <p className="text-sm text-red-600 mt-2">{paymentError}</p>}
-        <Button onClick={handleStripePayment} disabled={loading || stripeLoading} className="w-full mt-4">
-          {loading || stripeLoading ? 'Processing...' : `Pay ${currency} ${plan?.price.toLocaleString()}`}
+        <Button onClick={handleStripePayment} disabled={loadingLocal || stripeLoading} className="w-full mt-4">
+          {loadingLocal || stripeLoading ? "Processing..." : `Pay ${currency} ${plan.price.toLocaleString()}`}
         </Button>
       </div>
     );
   }
 
-  // PayPal create/capture callbacks
   async function handleCreatePayPalOrder(): Promise<string> {
-    // create internal order first
-    const orderId = await createOrderOnServer('paypal');
-    const res = await http('/api/payments/paypal/create-order', {
-      method: 'POST',
+    const orderId = await createOrderOnServer("paypal");
+    const res = await http("/api/payments/paypal/create-order", {
+      method: "POST",
       body: JSON.stringify({ orderId })
     });
     const paypalOrderId = (res as any)?.payment?.paypalOrderId;
-    if (!paypalOrderId) throw new Error('Unable to create PayPal order');
+    if (!paypalOrderId) throw new Error("Unable to create PayPal order");
     return paypalOrderId;
   }
 
-
   const paymentMethods = [
     {
-      id: 'card',
-      name: 'Credit/Debit Card',
-      description: 'Powered by Stripe / Paystack International',
+      id: "card",
+      name: "Credit/Debit Card",
+      description: "Powered by Stripe / Paystack International",
       icon: CreditCard,
     },
     {
-      id: 'paypal',
-      name: 'PayPal',
-      description: 'Pay with PayPal',
+      id: "paypal",
+      name: "PayPal",
+      description: "Pay with PayPal",
       icon: Building,
     },
     {
-      id: 'mobile-money',
-      name: 'Mobile Money',
-      description: 'MTN, Airtel, Vodafone (Flutterwave / Paystack)',
+      id: "mobile-money",
+      name: "Mobile Money",
+      description: "MTN, Airtel, Vodafone (Flutterwave / Paystack)",
       icon: Smartphone,
     },
     {
-      id: 'bank-transfer',
-      name: 'Bank Transfer',
-      description: 'Local bank integrations',
+      id: "bank-transfer",
+      name: "Bank Transfer",
+      description: "Local bank integrations",
       icon: Banknote,
     }
   ];
 
   return (
     <div className="min-h-screen bg-muted">
-      {/* Header */}
       <div className="bg-white border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link to={`/plan/${plan.id}`}>
+          <Link to={`/plan/${plan._id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Plan
@@ -184,7 +223,6 @@ export default function Checkout() {
         <h1 className="text-3xl mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Payment Method Selection */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
@@ -208,8 +246,7 @@ export default function Checkout() {
                   <div className="space-y-3">
                     {paymentMethods.map((method) => {
                       const Icon = method.icon;
-                      // Hide mobile-money and bank-transfer when currency is USD
-                      if (currency === 'USD' && (method.id === 'mobile-money' || method.id === 'bank-transfer')) {
+                      if (currency === "USD" && (method.id === "mobile-money" || method.id === "bank-transfer")) {
                         return null;
                       }
                       return (
@@ -217,8 +254,8 @@ export default function Checkout() {
                           key={method.id}
                           className={`flex items-start gap-4 p-4 border rounded-lg cursor-pointer transition-colors ${
                             paymentMethod === method.id
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
                           }`}
                           onClick={() => setPaymentMethod(method.id)}
                         >
@@ -240,7 +277,7 @@ export default function Checkout() {
                   </div>
                 </RadioGroup>
 
-                {paymentMethod === 'bank-transfer' && (
+                {paymentMethod === "bank-transfer" && (
                   <div className="mt-6 p-4 bg-muted rounded-lg">
                     <h4 className="font-semibold mb-3">Bank Transfer Details</h4>
                     <div className="space-y-2 text-sm">
@@ -255,73 +292,77 @@ export default function Checkout() {
                   </div>
                 )}
 
-                {/* Payment provider UIs (Stripe Elements + PayPal) */}
-                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID ?? 'sb', currency }}>
-                  <Elements stripe={stripePromise as unknown as ElementsStripeProp}>
-                    {paymentMethod === 'card' && (
-                      <div className="mt-6">
+                {paymentMethod === "card" && (
+                  <div className="mt-6">
+                    {stripePromise ? (
+                      <Elements stripe={stripePromise as ElementsStripeProp}>
                         <StripeCardForm />
+                      </Elements>
+                    ) : (
+                      <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        Stripe is not configured yet. Add `VITE_STRIPE_PUBLIC_KEY` to your frontend `.env` file to enable card payments.
                       </div>
                     )}
+                  </div>
+                )}
 
-                    {paymentMethod === 'paypal' && (
-                      <div className="mt-6">
-                        <PayPalButtons
-                          style={{ layout: 'vertical' }}
-                          createOrder={async (_data, _actions) => {
-                            try {
-                              setPaypalLoading(true);
-                              const paypalOrderId = await handleCreatePayPalOrder();
-                              return paypalOrderId;
-                            } finally {
-                              setPaypalLoading(false);
-                            }
-                          }}
-                          onApprove={async (data, _actions) => {
-                            try {
-                              setPaypalLoading(true);
-                              await http('/api/payments/paypal/capture-order', {
-                                method: 'POST',
-                                body: JSON.stringify({ paypalOrderId: data.orderID })
-                              });
-                              toast.success('Payment captured');
-                              navigate(`/payment/success?gateway=paypal&orderId=${data.orderID}`);
-                            } catch (err) {
-                              toast.error((err as Error).message ?? 'PayPal capture failed');
-                            } finally {
-                              setPaypalLoading(false);
-                            }
-                          }}
-                          onError={(err) => {
-                            toast.error('PayPal error: ' + String(err));
-                          }}
-                        />
-                      </div>
-                    )}
-                  </Elements>
-                </PayPalScriptProvider>
+                {paymentMethod === "paypal" && (
+                  <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID ?? "sb", currency }}>
+                    <div className="mt-6">
+                      <PayPalButtons
+                        style={{ layout: "vertical" }}
+                        createOrder={async () => {
+                          try {
+                            setPaypalLoading(true);
+                            const paypalOrderId = await handleCreatePayPalOrder();
+                            return paypalOrderId;
+                          } finally {
+                            setPaypalLoading(false);
+                          }
+                        }}
+                        onApprove={async (data) => {
+                          try {
+                            setPaypalLoading(true);
+                            await http("/api/payments/paypal/capture-order", {
+                              method: "POST",
+                              body: JSON.stringify({ paypalOrderId: data.orderID })
+                            });
+                            toast.success("Payment captured");
+                            navigate(`/payment/success?gateway=paypal&orderId=${data.orderID}`);
+                          } catch (err) {
+                            toast.error((err as Error).message ?? "PayPal capture failed");
+                          } finally {
+                            setPaypalLoading(false);
+                          }
+                        }}
+                        onError={(err) => {
+                          toast.error("PayPal error: " + String(err));
+                        }}
+                      />
+                    </div>
+                  </PayPalScriptProvider>
+                )}
 
-                {/* Mobile money and bank flows fallback button */}
-                {(paymentMethod === 'mobile-money' || paymentMethod === 'bank-transfer') && (
+                {(paymentMethod === "mobile-money" || paymentMethod === "bank-transfer") && (
                   <Button
                     onClick={async () => {
                       setPaymentError(null);
                       setIsProcessing(true);
                       try {
-                        if (paymentMethod === 'mobile-money') {
-                          const orderId = await createOrderOnServer('mobile-money');
-                          const res = await http('/api/payments/flutterwave/initialize', {
-                            method: 'POST',
+                        if (paymentMethod === "mobile-money") {
+                          const orderId = await createOrderOnServer("mobile-money");
+                          const res = await http("/api/payments/flutterwave/initialize", {
+                            method: "POST",
                             body: JSON.stringify({ orderId })
                           });
                           const authUrl = (res as any)?.payment?.authorizationUrl;
                           if (authUrl) window.location.href = authUrl;
-                          else toast.success('Mobile money initialized. Follow provider flow.');
+                          else toast.success("Mobile money initialized. Follow provider flow.");
                         } else {
-                          toast.success('Please follow the bank transfer instructions shown on the page.');
+                          toast.success("Please follow the bank transfer instructions shown on the page.");
                         }
                       } catch (err) {
-                        toast.error((err as Error).message ?? 'Payment initialization failed');
+                        toast.error((err as Error).message ?? "Payment initialization failed");
                       } finally {
                         setIsProcessing(false);
                       }
@@ -330,13 +371,12 @@ export default function Checkout() {
                     size="lg"
                     className="w-full mt-6"
                   >
-                    {isProcessing ? 'Processing...' : `Pay ${currency} ${plan.price.toLocaleString()}`}
+                    {isProcessing ? "Processing..." : `Pay ${currency} ${plan.price.toLocaleString()}`}
                   </Button>
                 )}
               </CardContent>
             </Card>
 
-            {/* Security Notice */}
             <div className="mt-6 p-4 bg-white rounded-lg border border-border">
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
@@ -350,7 +390,6 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <Card className="sticky top-4">
               <CardHeader>
@@ -359,14 +398,16 @@ export default function Checkout() {
               <CardContent>
                 <div className="aspect-[4/3] bg-muted rounded-lg mb-4 overflow-hidden">
                   <ImageWithFallback
-                    src={`https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80`}
-                    alt={plan.name}
+                    src={resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0])}
+                    alt={plan.title}
                     className="w-full h-full object-cover"
                   />
                 </div>
 
-                <h3 className="font-semibold mb-2">{plan.name}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{plan.category}</p>
+                <h3 className="font-semibold mb-2">{plan.title}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {formatPlanCategoryLabel(plan.category)}
+                </p>
 
                 <div className="space-y-3 py-4 border-t border-b border-border">
                   <div className="flex justify-between text-sm">
@@ -387,7 +428,7 @@ export default function Checkout() {
                 </div>
 
                 <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <h4 className="font-semibold mb-3 text-sm">What You'll Get</h4>
+                  <h4 className="font-semibold mb-3 text-sm">What You&apos;ll Get</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-primary" />

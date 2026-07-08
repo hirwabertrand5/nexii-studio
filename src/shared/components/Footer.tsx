@@ -1,7 +1,18 @@
-import { Link } from "react-router";
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, LogOut } from "lucide-react";
+import { Button } from "@/shared/ui/button";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export function Footer() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuth();
+  const accountHref = user?.role === "admin" ? "/admin" : "/dashboard";
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
+
   return (
     <footer className="bg-[#1e3a8a] text-white mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -26,7 +37,30 @@ export function Footer() {
               <li><Link to="/" className="hover:text-white">Home</Link></li>
               <li><Link to="/catalog" className="hover:text-white">Browse Plans</Link></li>
               <li><Link to="/custom-design" className="hover:text-white">Custom Design</Link></li>
-              <li><Link to="/dashboard" className="hover:text-white">My Account</Link></li>
+              <li>
+                {isAuthenticated && user ? (
+                  <Link to={accountHref} className="hover:text-white">
+                    My Account
+                  </Link>
+                ) : (
+                  <Link to="/login" className="hover:text-white">
+                    Login
+                  </Link>
+                )}
+              </li>
+              {isAuthenticated && user && (
+                <li>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-0 text-blue-100 hover:text-white hover:bg-transparent"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Log out
+                  </Button>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -52,7 +86,7 @@ export function Footer() {
               </li>
               <li className="flex items-start gap-2">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>+250 796 066 681</span>
+                <span>+250 796066681</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />

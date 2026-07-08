@@ -1,0 +1,138 @@
+import { http } from "@/shared/api/http";
+
+function withQuery(path: string, params?: Record<string, unknown>) {
+  if (!params) return path;
+
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== "") {
+          searchParams.append(key, String(item));
+        }
+      }
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+
+  const qs = searchParams.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+const fallbackImage =
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80";
+
+export const SUPPORTED_PLAN_CATEGORIES = [
+  { value: "bungalow", label: "Bungalow" },
+  { value: "duplex", label: "Duplex" },
+  { value: "modern-villa", label: "Modern Villa" },
+  { value: "small-plot-home", label: "Small Plot Home" },
+  { value: "african-contemporary", label: "African Contemporary" }
+] as const;
+
+export interface PublicPagination {
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface PublicPlanSummary {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  bedrooms: number;
+  bathrooms: number;
+  floors: number;
+  plotSize: number;
+  totalArea: number;
+  architecturalStyle: string;
+  category: string;
+  images: string[];
+  previewImages?: string[];
+  filesIncluded?: string[];
+  status?: string;
+  isFeatured: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PublicPlanListResponse {
+  plans: PublicPlanSummary[];
+  pagination: PublicPagination;
+}
+
+export interface PublicPlanDetailResponse {
+  plan: PublicPlanSummary;
+  relatedPlans: PublicPlanSummary[];
+}
+
+export interface PublicPlanCategoryOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export function formatPlanCategoryLabel(category?: string) {
+  if (!category) return "House Plan";
+
+  const preset = SUPPORTED_PLAN_CATEGORIES.find((item) => item.value === category);
+  if (preset) return preset.label;
+
+  return category
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function resolvePlanImageUrl(src?: string | null) {
+  if (!src) return fallbackImage;
+  if (src.startsWith("local://")) {
+    return `/uploads/${src.replace("local://", "").replace(/^\/+/, "")}`;
+  }
+  if (src.startsWith("private://") || src.startsWith("cloudinary://") || src.startsWith("s3://")) {
+    return fallbackImage;
+  }
+  if (src.startsWith("uploads/")) {
+    return `/${src.replace(/^\/+/, "")}`;
+  }
+  if (src.startsWith("server/uploads/")) {
+    return `/uploads/${src.replace(/^server\/uploads\//, "")}`;
+  }
+  if (src.startsWith("/uploads/")) return src;
+  if (src.startsWith("/")) return src;
+  if (/^https?:\/\//i.test(src)) {
+    return src;
+  }
+  if (/^(data:|blob:)/i.test(src)) return src;
+  return fallbackImage;
+}
+
+export function collectPlanCategories(plans: PublicPlanSummary[]): PublicPlanCategoryOption[] {
+  const counts = new Map<string, number>();
+
+  plans.forEach((plan) => {
+    const value = plan.category?.trim();
+    if (!value) return;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([value, count]) => ({
+      value,
+      label: formatPlanCategoryLabel(value),
+      count
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export const publicPlansApi = {
+  getPlans: (params?: Record<string, unknown>) =>
+    http<PublicPlanListResponse>(withQuery("/api/plans", params)),
+  getPlanById: (id: string) =>
+    http<PublicPlanDetailResponse>(`/api/plans/${id}`)
+};
