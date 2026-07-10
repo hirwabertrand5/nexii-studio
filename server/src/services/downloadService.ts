@@ -68,7 +68,7 @@ export async function prepareSecureDownload(userId: string, planId: string) {
         fileName,
         contentType: "application/octet-stream",
         sizeInBytes: null,
-        downloadUrl: null
+        downloadUrl: `/api/downloads/${plan._id}/files/${encodeURIComponent(fileName)}?token=${downloadToken}`
       }));
 
   const bundleName = `${plan.title} secure bundle`;

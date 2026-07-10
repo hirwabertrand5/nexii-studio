@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
-import { CheckCircle, Download, FileText, Loader2 } from "lucide-react";
+import { CheckCircle as CheckCircleIcon, Download as DownloadIcon, FileText as FileTextIcon, Loader2 as Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { http } from "@/shared/api/http";
 import { getMyOrders, type BuyerOrder, type BuyerOrderPlanItem } from "../api/buyerApi";
+import { resolvePlanImageUrl } from "@/features/public/api/plansApi";
 
 type DownloadFile = {
   label: string;
@@ -19,8 +20,11 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&q=80";
 
 function getPlanImage(plan: BuyerOrderPlanItem) {
-  if (typeof plan.plan !== "object") return FALLBACK_IMAGE;
-  return plan.plan.previewImages?.[0] || plan.plan.images?.[0] || FALLBACK_IMAGE;
+  let src: string | undefined | null = undefined;
+  if (typeof plan.plan === "object") {
+    src = plan.plan.previewImages?.[0] || plan.plan.images?.[0] || null;
+  }
+  return resolvePlanImageUrl(src ?? null);
 }
 
 function getPlanId(plan: BuyerOrderPlanItem) {
@@ -115,7 +119,7 @@ export default function PurchasedPlansPage() {
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -142,7 +146,7 @@ export default function PurchasedPlansPage() {
       {visibleOrders.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <FileTextIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg mb-2">No orders yet</h3>
             <p className="text-muted-foreground mb-6">
               Buy a plan from the catalog to see it here.
@@ -214,7 +218,7 @@ export default function PurchasedPlansPage() {
                         <div className="md:col-span-3">
                           <div className="bg-muted p-4 rounded-lg h-full">
                             <h4 className="font-semibold mb-3 flex items-center gap-2">
-                              <FileText className="w-4 h-4" />
+                              <FileTextIcon className="w-4 h-4" />
                               Private Deliverables
                             </h4>
                             <p className="text-sm text-muted-foreground mb-4">
@@ -224,7 +228,7 @@ export default function PurchasedPlansPage() {
                               <div className="space-y-2 mb-4">
                                 {loadingDeliverables[getPlanId(plan)] ? (
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <Loader2Icon className="w-4 h-4 animate-spin" />
                                     Loading files...
                                   </div>
                                 ) : (deliverables[getPlanId(plan)]?.length ?? 0) > 0 ? (
@@ -254,9 +258,9 @@ export default function PurchasedPlansPage() {
                               disabled={!order.downloadAccess || activeDownload === getPlanId(plan)}
                             >
                               {activeDownload === getPlanId(plan) ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
                               ) : (
-                                <Download className="w-4 h-4 mr-2" />
+                                <DownloadIcon className="w-4 h-4 mr-2" />
                               )}
                               {order.downloadAccess ? "Refresh Access" : "Not Available"}
                             </Button>
@@ -282,7 +286,7 @@ export default function PurchasedPlansPage() {
           <h3 className="font-semibold mb-4">Need Help?</h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+              <CheckCircleIcon className="w-5 h-5 text-primary mt-0.5" />
               <div>
                 <p className="font-semibold text-sm">File Access</p>
                 <p className="text-sm text-muted-foreground">
@@ -291,7 +295,7 @@ export default function PurchasedPlansPage() {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+              <CheckCircleIcon className="w-5 h-5 text-primary mt-0.5" />
               <div>
                 <p className="font-semibold text-sm">Formats</p>
                 <p className="text-sm text-muted-foreground">

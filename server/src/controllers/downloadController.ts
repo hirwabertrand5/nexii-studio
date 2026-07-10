@@ -63,7 +63,15 @@ export async function streamPlanFile(req: Request, res: Response) {
   if (!plan || plan.status !== "published") throw new AppError("Plan is unavailable for download", 404);
 
   const digitalFile = plan.digitalFiles.find((file) => file.fileName === fileName || file.label === fileName);
-  if (!digitalFile) throw new AppError("Requested file is not available", 404);
+  if (!digitalFile) {
+    // Check if file is in filesIncluded but no actual storage file exists
+    const isInFilesIncluded = plan.filesIncluded?.includes(fileName);
+    if (!isInFilesIncluded) {
+      throw new AppError("Requested file is not available", 404);
+    }
+    // File is listed but has no actual storage, return a friendly message
+    throw new AppError("File is listed but has not been uploaded yet. Please contact support.", 400);
+  }
 
   const absolutePath = resolvePrivateFilePath(digitalFile.storageKey);
   if (!absolutePath || !fs.existsSync(absolutePath)) {
