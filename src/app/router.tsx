@@ -1,37 +1,57 @@
+import { Suspense, lazy, type ComponentType } from "react";
 import { createBrowserRouter } from "react-router";
 import RootLayout from "./layouts/RootLayout";
 import BuyerLayout from "./layouts/BuyerLayout";
 import AdminLayout from "./layouts/AdminLayout";
 import { AdminOnlyRoute, BuyerOnlyRoute } from "@/shared/auth/ProtectedRoute";
 
+const PageLoader = () => (
+  <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+    <div className="text-sm">Loading...</div>
+  </div>
+);
+
+function withSuspense<T extends ComponentType<any>>(importer: () => Promise<{ default: T }>) {
+  const LazyComponent = lazy(importer);
+
+  return function LazyRouteComponent(props: any) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <LazyComponent {...props} />
+      </Suspense>
+    );
+  };
+}
+
 // Public Pages
-import HomePage from "@/features/public/pages/HomePage";
-import CatalogPage from "@/features/public/pages/CatalogPage";
-import PlanDetailsPage from "@/features/public/pages/PlanDetailsPage";
-import CustomDesignRequestPage from "@/features/public/pages/CustomDesignRequestPage";
-import CheckoutPage from "@/features/public/pages/CheckoutPage";
+const HomePage = withSuspense(() => import("@/features/public/pages/HomePage"));
+const CatalogPage = withSuspense(() => import("@/features/public/pages/CatalogPage"));
+const PlanDetailsPage = withSuspense(() => import("@/features/public/pages/PlanDetailsPage"));
+const CustomDesignRequestPage = withSuspense(() => import("@/features/public/pages/CustomDesignRequestPage"));
+const CheckoutPage = withSuspense(() => import("@/features/public/pages/CheckoutPage"));
+const PaymentStatusPage = withSuspense(() => import("@/features/public/pages/PaymentStatusPage"));
 
 // Auth Pages
-import LoginPage from "@/features/auth/pages/LoginPage";
-import RegisterPage from "@/features/auth/pages/RegisterPage";
-import AdminLoginPage from "@/features/auth/pages/AdminLoginPage";
+const LoginPage = withSuspense(() => import("@/features/auth/pages/LoginPage"));
+const RegisterPage = withSuspense(() => import("@/features/auth/pages/RegisterPage"));
+const AdminLoginPage = withSuspense(() => import("@/features/auth/pages/AdminLoginPage"));
 
 // Buyer Dashboard Pages
-import BuyerDashboardPage from "@/features/buyer/pages/BuyerDashboardPage";
-import PurchasedPlansPage from "@/features/buyer/pages/PurchasedPlansPage";
-import BuyerCustomRequestsPage from "@/features/buyer/pages/BuyerCustomRequestsPage";
-import BuyerProfilePage from "@/features/buyer/pages/BuyerProfilePage";
+const BuyerDashboardPage = withSuspense(() => import("@/features/buyer/pages/BuyerDashboardPage"));
+const PurchasedPlansPage = withSuspense(() => import("@/features/buyer/pages/PurchasedPlansPage"));
+const BuyerCustomRequestsPage = withSuspense(() => import("@/features/buyer/pages/BuyerCustomRequestsPage"));
+const BuyerProfilePage = withSuspense(() => import("@/features/buyer/pages/BuyerProfilePage"));
 
 // Admin Dashboard Pages
-import AdminDashboardPage from "@/features/admin/pages/AdminDashboardPage";
-import ManagePlansPage from "@/features/admin/pages/ManagePlansPage";
-import AddPlanPage from "@/features/admin/pages/AddPlanPage";
-import EditPlanPage from "@/features/admin/pages/EditPlanPage";
-import OrdersManagementPage from "@/features/admin/pages/OrdersManagementPage";
-import OrderDetailsPage from "@/features/admin/pages/OrderDetailsPage";
-import AdminCustomRequestsPage from "@/features/admin/pages/AdminCustomRequestsPage";
-import CustomRequestDetailsPage from "@/features/admin/pages/CustomRequestDetailsPage";
-import UsersManagementPage from "@/features/admin/pages/UsersManagementPage";
+const AdminDashboardPage = withSuspense(() => import("@/features/admin/pages/AdminDashboardPage"));
+const ManagePlansPage = withSuspense(() => import("@/features/admin/pages/ManagePlansPage"));
+const AddPlanPage = withSuspense(() => import("@/features/admin/pages/AddPlanPage"));
+const EditPlanPage = withSuspense(() => import("@/features/admin/pages/EditPlanPage"));
+const OrdersManagementPage = withSuspense(() => import("@/features/admin/pages/OrdersManagementPage"));
+const OrderDetailsPage = withSuspense(() => import("@/features/admin/pages/OrderDetailsPage"));
+const AdminCustomRequestsPage = withSuspense(() => import("@/features/admin/pages/AdminCustomRequestsPage"));
+const CustomRequestDetailsPage = withSuspense(() => import("@/features/admin/pages/CustomRequestDetailsPage"));
+const UsersManagementPage = withSuspense(() => import("@/features/admin/pages/UsersManagementPage"));
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +66,8 @@ export const router = createBrowserRouter([
       { path: "register", Component: RegisterPage },
       { path: "admin/login", Component: AdminLoginPage },
       { path: "checkout/:id", Component: CheckoutPage },
+      { path: "payment/success", Component: PaymentStatusPage },
+      { path: "payment/cancel", Component: PaymentStatusPage },
     ],
   },
   {

@@ -91,24 +91,36 @@ export function formatPlanCategoryLabel(category?: string) {
 
 export function resolvePlanImageUrl(src?: string | null) {
   if (!src) return fallbackImage;
-  if (src.startsWith("local://")) {
-    return `/uploads/${src.replace("local://", "").replace(/^\/+/, "")}`;
+  const value = String(src).trim();
+  if (!value) return fallbackImage;
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      if (url.pathname.startsWith("/uploads/")) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+      return value;
+    } catch {
+      // fall through to relative path handling
+    }
   }
-  if (src.startsWith("private://") || src.startsWith("cloudinary://") || src.startsWith("s3://")) {
+
+  if (value.startsWith("local://")) {
+    return `/uploads/${value.replace("local://", "").replace(/^\/+/, "")}`;
+  }
+  if (value.startsWith("private://") || value.startsWith("cloudinary://") || value.startsWith("s3://")) {
     return fallbackImage;
   }
-  if (src.startsWith("uploads/")) {
-    return `/${src.replace(/^\/+/, "")}`;
+  if (value.startsWith("uploads/")) {
+    return `/${value.replace(/^\/+/, "")}`;
   }
-  if (src.startsWith("server/uploads/")) {
-    return `/uploads/${src.replace(/^server\/uploads\//, "")}`;
+  if (value.startsWith("server/uploads/")) {
+    return `/uploads/${value.replace(/^server\/uploads\//, "")}`;
   }
-  if (src.startsWith("/uploads/")) return src;
-  if (src.startsWith("/")) return src;
-  if (/^https?:\/\//i.test(src)) {
-    return src;
-  }
-  if (/^(data:|blob:)/i.test(src)) return src;
+  if (value.startsWith("/uploads/")) return value;
+  if (value.startsWith("/")) return value;
+  if (/^(data:|blob:)/i.test(value)) return value;
   return fallbackImage;
 }
 

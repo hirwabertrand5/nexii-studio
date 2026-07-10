@@ -31,7 +31,6 @@ export function createApp() {
   // Security middleware
   app.use(
     helmet({
-      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
       contentSecurityPolicy: {
         useDefaults: true,
         directives: {

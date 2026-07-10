@@ -10,6 +10,7 @@ import {
 } from "../controllers/paymentController.js";
 import {
   createStripeIntent,
+  verifyStripeIntent,
   createPayPalOrder,
   capturePayPalOrderController
 } from "../controllers/paymentController.js";
@@ -25,6 +26,7 @@ paymentRoutes.post("/paystack/webhook", asyncHandler(paystackWebhook));
 
 // Stripe & PayPal endpoints for checkout initiation
 paymentRoutes.post("/stripe/create-intent", requireAuth, requireBuyer, asyncHandler(createStripeIntent));
+paymentRoutes.post("/stripe/verify", requireAuth, requireBuyer, asyncHandler(verifyStripeIntent));
 
 paymentRoutes.post("/paypal/create-order", requireAuth, requireBuyer, asyncHandler(createPayPalOrder));
 paymentRoutes.post("/paypal/capture-order", requireAuth, requireBuyer, asyncHandler(capturePayPalOrderController));

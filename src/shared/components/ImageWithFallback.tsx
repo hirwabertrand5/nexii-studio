@@ -14,18 +14,43 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
     setDidError(true)
   }
 
-  const { src, alt, style, className, ...rest } = props
+  const { src, alt, style, className, loading, decoding, sizes, fetchPriority, ...rest } = props
+  const resolvedLoading = loading ?? 'lazy'
+  const resolvedDecoding = decoding ?? 'async'
+  const resolvedSizes = sizes ?? '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+  // default classes to ensure images always fill the reserved tile and behave consistently
+  const baseImgClasses = 'block h-full w-full object-cover object-center transition-transform duration-300 ease-out transform-gpu'
+  const finalClassName = [className, baseImgClasses].filter(Boolean).join(' ')
 
   return didError ? (
     <div
-      className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
+      className={`inline-block h-full w-full overflow-hidden bg-gray-100 text-center align-middle ${className ?? ''}`}
       style={style}
     >
-      <div className="flex items-center justify-center w-full h-full">
-        <img src={ERROR_IMG_SRC} alt="Error loading image" {...rest} data-original-url={src} />
+      <div className="flex h-full w-full items-center justify-center">
+        <img
+          src={ERROR_IMG_SRC}
+          alt="Error loading image"
+          className={baseImgClasses}
+          loading={resolvedLoading}
+          decoding={resolvedDecoding}
+          sizes={resolvedSizes}
+          {...rest}
+          data-original-url={src}
+        />
       </div>
     </div>
   ) : (
-    <img src={src} alt={alt} className={className} style={style} {...rest} onError={handleError} />
+    <img
+      src={src}
+      alt={alt}
+      className={finalClassName}
+      style={style}
+      loading={resolvedLoading}
+      decoding={resolvedDecoding}
+      sizes={resolvedSizes}
+      {...rest}
+      onError={handleError}
+    />
   )
 }

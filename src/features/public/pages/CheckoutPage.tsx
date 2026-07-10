@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -9,7 +9,7 @@ import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
 import { ArrowLeft, CheckCircle, CreditCard, Smartphone, Building, Banknote, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { http } from "@/shared/api/http";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -21,7 +21,371 @@ import {
 } from "@/features/public/api/plansApi";
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-type ElementsStripeProp = ComponentProps<typeof Elements>["stripe"];
+
+type StripePaymentFormProps = {
+  orderId: string;
+  currency: string;
+  price: number;
+  user?: {
+    fullName?: string;
+    email?: string;
+  } | null;
+  onNavigateSuccess: (url: string) => void;
+  setPaymentError: (message: string | null) => void;
+  setStripeLoading: (loading: boolean) => void;
+};
+
+function StripePaymentForm({
+  orderId,
+  currency,
+  price,
+  user,
+  onNavigateSuccess,
+  setPaymentError,
+  setStripeLoading
+}: StripePaymentFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [name, setName] = useState(user?.fullName ?? "");
+  const [loadingLocal, setLoadingLocal] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [paymentElementMounted, setPaymentElementMounted] = useState(false);
+  const [paymentState, setPaymentState] = useState<"idle" | "processing" | "succeeded" | "failed">("idle");
+  const confirmingRef = useRef(false);
+
+  useEffect(() => {
+    console.log("[stripe] stripe", stripe);
+    console.log("[stripe] elements", elements);
+  }, [stripe, elements]);
+
+  useEffect(() => {
+    return () => {
+      console.log("[stripe] PaymentElement unmounted");
+    };
+  }, []);
+
+  const handleStripePayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (confirmingRef.current) return;
+    setPaymentError(null);
+    console.log("[stripe] confirmPayment()", {
+      stripe,
+      elements,
+      paymentElementMounted
+    });
+
+    if (!stripe || !elements) {
+      setPaymentError("Payment system not ready");
+      return;
+    }
+
+    if (!paymentElementMounted) {
+      setPaymentError("Secure card form is still loading. Please wait a moment and try again.");
+      return;
+    }
+
+    confirmingRef.current = true;
+    setLoadingLocal(true);
+    setStripeLoading(true);
+    setPaymentState("processing");
+    try {
+      const submitResult = await elements.submit();
+      if (submitResult.error) {
+        console.log("[stripe] element validation error", submitResult.error);
+        throw new Error(submitResult.error.message ?? "Please complete your card details.");
+      }
+
+      if (!paymentComplete) {
+        throw new Error("Please complete the secure card form before submitting.");
+      }
+
+      const result = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment/success?gateway=stripe&orderId=${orderId}`,
+          payment_method_data: {
+            billing_details: {
+              name: name || undefined,
+              email: user?.email || undefined
+            }
+          }
+        },
+        redirect: "if_required"
+      });
+
+      if (result.error) {
+        console.log("[stripe] confirmPayment error", result.error);
+        throw new Error(result.error.message ?? "Card payment failed");
+      }
+
+      const paymentIntent = result.paymentIntent;
+      if (!paymentIntent) {
+        throw new Error("Stripe did not return a payment result");
+      }
+
+      console.log("[stripe] confirmPayment result", {
+        paymentIntentId: paymentIntent.id,
+        status: paymentIntent.status
+      });
+
+      if (paymentIntent.id) {
+        const verification = await http("/api/payments/stripe/verify", {
+          method: "POST",
+          body: JSON.stringify({ paymentIntentId: paymentIntent.id, orderId })
+        });
+
+        if ((verification as any)?.pending) {
+          toast.info("Stripe is still processing your payment");
+        }
+      }
+
+      if (paymentIntent.status === "succeeded") {
+        setPaymentState("succeeded");
+        toast.success("Payment successful");
+        onNavigateSuccess(`/payment/success?gateway=stripe&orderId=${orderId}`);
+        return;
+      }
+
+      if (paymentIntent.status === "processing") {
+        setPaymentState("succeeded");
+        toast.success("Payment is processing");
+        onNavigateSuccess(`/payment/success?gateway=stripe&orderId=${orderId}`);
+        return;
+      }
+
+      if (paymentIntent.status === "requires_action") {
+        toast.info("Stripe needs one more authentication step to complete this payment.");
+        return;
+      }
+
+      throw new Error(`Stripe payment ended with status ${paymentIntent.status}`);
+    } catch (err) {
+      const m = err instanceof Error ? err.message : String(err);
+      setPaymentState("failed");
+      setPaymentError(m);
+      toast.error(m);
+    } finally {
+      confirmingRef.current = false;
+      setLoadingLocal(false);
+      setStripeLoading(false);
+    }
+  };
+
+  return (
+    <form className="mt-4 space-y-4" onSubmit={handleStripePayment}>
+      <div>
+        <Label>Cardholder name</Label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border rounded px-2 py-1 mt-1"
+          placeholder="Jane Doe"
+        />
+      </div>
+      <div className="border rounded p-4">
+        <Label className="text-sm mb-2 block">Card details</Label>
+        <PaymentElement
+          onReady={() => {
+            console.log("[stripe] PaymentElement mounted");
+            setPaymentElementMounted(true);
+          }}
+          onChange={(event) => {
+            setPaymentComplete(event.complete);
+            if (event.error) {
+              setPaymentError(event.error.message);
+            } else {
+              setPaymentError(null);
+            }
+          }}
+        />
+        {!paymentComplete && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Complete the secure Stripe card form to continue.
+          </p>
+        )}
+      </div>
+      {paymentState === "processing" && (
+        <div className="flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Securely processing your card payment...
+        </div>
+      )}
+      {paymentState === "succeeded" && (
+        <div className="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          <CheckCircle className="h-4 w-4" />
+          Payment confirmed. Unlocking your plan...
+        </div>
+      )}
+      {paymentState === "failed" && (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Payment was not completed. Review your card details and try again.
+        </div>
+      )}
+      <Button
+        type="submit"
+        disabled={loadingLocal || !paymentElementMounted || !paymentComplete}
+        className="w-full mt-4"
+      >
+        {loadingLocal ? (
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing payment...
+          </span>
+        ) : paymentState === "failed" ? (
+          `Retry Stripe Payment • ${currency} ${price.toLocaleString()}`
+        ) : (
+          `Pay with Stripe • ${currency} ${price.toLocaleString()}`
+        )}
+      </Button>
+    </form>
+  );
+}
+
+type StripePaymentSectionProps = {
+  existingOrderId?: string;
+  planId: string;
+  currency: string;
+  price: number;
+  stripePromise: ReturnType<typeof loadStripe> | null;
+  user?: StripePaymentFormProps["user"];
+  onNavigateSuccess: (url: string) => void;
+  setPaymentError: (message: string | null) => void;
+  setStripeLoading: (loading: boolean) => void;
+};
+
+function StripePaymentSection({
+  existingOrderId,
+  planId,
+  currency,
+  price,
+  stripePromise,
+  user,
+  onNavigateSuccess,
+  setPaymentError,
+  setStripeLoading
+}: StripePaymentSectionProps) {
+  const [stripeOrderId, setStripeOrderId] = useState(existingOrderId ?? "");
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const initStartedRef = useRef(false);
+  const initialCheckoutRef = useRef({ existingOrderId, planId, currency });
+
+  useEffect(() => {
+    let alive = true;
+
+    const initStripeCheckout = async () => {
+      if (initStartedRef.current) return;
+      initStartedRef.current = true;
+      setInitializing(true);
+      setInitializationError(null);
+
+      try {
+        const checkout = initialCheckoutRef.current;
+        const orderId = checkout.existingOrderId ?? await createStripeOrderOnServer(checkout.planId, checkout.currency);
+        const init = await http("/api/payments/stripe/create-intent", {
+          method: "POST",
+          body: JSON.stringify({ orderId })
+        });
+        const secret = (init as any)?.payment?.clientSecret;
+        if (!secret) throw new Error("Unable to initialize Stripe payment");
+
+        console.log("[stripe] initialized checkout", {
+          orderId,
+          paymentIntentId: (init as any)?.payment?.paymentIntentId,
+          status: (init as any)?.payment?.status,
+          clientSecret: secret
+        });
+        console.log("[stripe] clientSecret", secret);
+
+        if (!alive) return;
+        setStripeOrderId(orderId);
+        setClientSecret(secret);
+      } catch (err) {
+        if (!alive) return;
+        setInitializationError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (alive) setInitializing(false);
+      }
+    };
+
+    initStripeCheckout();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const elementsOptions = useMemo(
+    () =>
+      clientSecret
+        ? {
+            clientSecret,
+            appearance: {
+              theme: "stripe" as const,
+              variables: {
+                colorPrimary: "#0f172a",
+                colorText: "#0f172a",
+                colorDanger: "#ef4444",
+                borderRadius: "10px"
+              }
+            }
+          }
+        : undefined,
+    [clientSecret]
+  );
+
+  if (initializing) {
+    return (
+      <div className="mt-4 rounded-lg border border-border bg-muted/30 p-6 text-center">
+        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Preparing secure Stripe checkout...</p>
+      </div>
+    );
+  }
+
+  if (initializationError) {
+    return (
+      <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {initializationError}
+      </div>
+    );
+  }
+
+  if (!stripePromise || !clientSecret || !elementsOptions) {
+    return (
+      <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        Stripe is not configured yet. Add `VITE_STRIPE_PUBLIC_KEY` to your frontend `.env` file to enable card payments.
+      </div>
+    );
+  }
+
+  const checkoutCurrency = initialCheckoutRef.current.currency;
+
+  return (
+    <Elements stripe={stripePromise} options={elementsOptions}>
+      <StripePaymentForm
+        orderId={stripeOrderId || existingOrderId || ""}
+        currency={checkoutCurrency}
+        price={price}
+        user={user}
+        onNavigateSuccess={onNavigateSuccess}
+        setPaymentError={setPaymentError}
+        setStripeLoading={setStripeLoading}
+      />
+    </Elements>
+  );
+}
+
+async function createStripeOrderOnServer(planId: string, currency: string) {
+  const payload = await http("/api/orders/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plans: [planId], paymentMethod: "card", currency })
+  });
+  const orderId = (payload as any)?.order?._id ?? (payload as any)?.order?.id;
+  if (!orderId) throw new Error("Order not created");
+  return orderId as string;
+}
 
 export default function Checkout() {
   const { id } = useParams();
@@ -37,6 +401,7 @@ export default function Checkout() {
   const [stripeLoading, setStripeLoading] = useState(false);
   const [paypalLoading, setPaypalLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -99,84 +464,16 @@ export default function Checkout() {
     return orderId as string;
   }
 
-  function StripeCardForm({ existingOrderId }: { existingOrderId?: string }) {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [name, setName] = useState(user?.fullName ?? "");
-    const [loadingLocal, setLoadingLocal] = useState(false);
-
-    const CARD_OPTIONS = {
-      style: {
-        base: { fontSize: "16px", color: "#0f172a", "::placeholder": { color: "#94a3b8" } },
-        invalid: { color: "#ef4444" }
-      }
-    };
-
-    const handleStripePayment = async () => {
-      setPaymentError(null);
-      if (!stripe || !elements) {
-        setPaymentError("Payment system not ready");
-        return;
-      }
-      setLoadingLocal(true);
-      setStripeLoading(true);
-      try {
-        const orderId = existingOrderId ?? (await createOrderOnServer("card"));
-
-        const init = await http("/api/payments/stripe/create-intent", {
-          method: "POST",
-          body: JSON.stringify({ orderId })
-        });
-        const clientSecret = (init as any)?.payment?.clientSecret;
-        if (!clientSecret) throw new Error("Unable to initialize Stripe payment");
-
-        const card = elements.getElement(CardElement);
-        if (!card) throw new Error("Card input not found");
-
-        const result = await stripe.confirmCardPayment(clientSecret, {
-          payment_method: { card, billing_details: { name: name || undefined, email: user?.email || undefined } }
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message ?? "Card was declined");
-        }
-
-        toast.success("Payment successful");
-        navigate(`/payment/success?gateway=stripe&orderId=${orderId}`);
-      } catch (err) {
-        const m = err instanceof Error ? err.message : String(err);
-        setPaymentError(m);
-        toast.error(m);
-      } finally {
-        setLoadingLocal(false);
-        setStripeLoading(false);
-      }
-    };
-
-    return (
-      <div className="mt-4">
-        <Label>Cardholder name</Label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full border rounded px-2 py-1 mt-1" />
-        <div className="mt-4 p-3 border rounded">
-          <CardElement options={CARD_OPTIONS} />
-        </div>
-        {paymentError && <p className="text-sm text-red-600 mt-2">{paymentError}</p>}
-        <Button onClick={handleStripePayment} disabled={loadingLocal || stripeLoading} className="w-full mt-4">
-          {loadingLocal || stripeLoading ? "Processing..." : `Pay ${currency} ${plan.price.toLocaleString()}`}
-        </Button>
-      </div>
-    );
-  }
-
-  async function handleCreatePayPalOrder(): Promise<string> {
+  async function handleCreatePayPalOrder(): Promise<{ orderId: string; paypalOrderId: string }> {
     const orderId = await createOrderOnServer("paypal");
+    setPendingOrderId(orderId);
     const res = await http("/api/payments/paypal/create-order", {
       method: "POST",
       body: JSON.stringify({ orderId })
     });
     const paypalOrderId = (res as any)?.payment?.paypalOrderId;
     if (!paypalOrderId) throw new Error("Unable to create PayPal order");
-    return paypalOrderId;
+    return { orderId, paypalOrderId };
   }
 
   const paymentMethods = [
@@ -205,6 +502,15 @@ export default function Checkout() {
       icon: Banknote,
     }
   ];
+
+  const primaryActionLabel =
+    paymentMethod === "card"
+      ? `Pay with Stripe • ${currency} ${plan.price.toLocaleString()}`
+      : paymentMethod === "paypal"
+        ? `Pay with PayPal • ${currency} ${plan.price.toLocaleString()}`
+        : paymentMethod === "mobile-money"
+          ? `Pay with Mobile Money • ${currency} ${plan.price.toLocaleString()}`
+          : `Pay via Bank Transfer • ${currency} ${plan.price.toLocaleString()}`;
 
   return (
     <div className="min-h-screen bg-muted">
@@ -295,26 +601,37 @@ export default function Checkout() {
                 {paymentMethod === "card" && (
                   <div className="mt-6">
                     {stripePromise ? (
-                      <Elements stripe={stripePromise as ElementsStripeProp}>
-                        <StripeCardForm />
-                      </Elements>
+                      <StripePaymentSection
+                        planId={plan._id}
+                        currency={currency}
+                        price={plan.price}
+                        stripePromise={stripePromise}
+                        user={user}
+                        onNavigateSuccess={navigate}
+                        setPaymentError={setPaymentError}
+                        setStripeLoading={setStripeLoading}
+                      />
                     ) : (
                       <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                         Stripe is not configured yet. Add `VITE_STRIPE_PUBLIC_KEY` to your frontend `.env` file to enable card payments.
                       </div>
                     )}
+                    {paymentError && <p className="text-sm text-red-600 mt-2">{paymentError}</p>}
                   </div>
                 )}
 
                 {paymentMethod === "paypal" && (
                   <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID ?? "sb", currency }}>
                     <div className="mt-6">
+                      <div className="mb-3 rounded border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+                        {primaryActionLabel}
+                      </div>
                       <PayPalButtons
                         style={{ layout: "vertical" }}
                         createOrder={async () => {
                           try {
                             setPaypalLoading(true);
-                            const paypalOrderId = await handleCreatePayPalOrder();
+                            const { paypalOrderId } = await handleCreatePayPalOrder();
                             return paypalOrderId;
                           } finally {
                             setPaypalLoading(false);
@@ -323,12 +640,13 @@ export default function Checkout() {
                         onApprove={async (data) => {
                           try {
                             setPaypalLoading(true);
+                            const orderId = pendingOrderId ?? (await createOrderOnServer("paypal"));
                             await http("/api/payments/paypal/capture-order", {
                               method: "POST",
                               body: JSON.stringify({ paypalOrderId: data.orderID })
                             });
                             toast.success("Payment captured");
-                            navigate(`/payment/success?gateway=paypal&orderId=${data.orderID}`);
+                            navigate(`/payment/success?gateway=paypal&orderId=${orderId}`);
                           } catch (err) {
                             toast.error((err as Error).message ?? "PayPal capture failed");
                           } finally {
@@ -371,7 +689,7 @@ export default function Checkout() {
                     size="lg"
                     className="w-full mt-6"
                   >
-                    {isProcessing ? "Processing..." : `Pay ${currency} ${plan.price.toLocaleString()}`}
+                    {isProcessing ? "Processing..." : primaryActionLabel}
                   </Button>
                 )}
               </CardContent>

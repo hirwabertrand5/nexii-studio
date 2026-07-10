@@ -33,7 +33,7 @@ const categoryIcons: Record<string, any> = {
 };
 
 const HERO_BACKGROUND =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1920&q=80";
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80";
 
 function formatUsd(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -48,11 +48,11 @@ function PlanCard({ plan }: { plan: PublicPlanSummary }) {
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-[4/3] bg-muted">
+      <div className="aspect-[4/3] overflow-hidden bg-muted">
         <ImageWithFallback
           src={imageSrc}
           alt={plan.title}
-          className="w-full h-full object-cover"
+          className="block h-full w-full object-cover object-center"
         />
       </div>
       <CardContent className="p-6">
@@ -96,7 +96,7 @@ export default function Home() {
     const loadPlans = async () => {
       try {
         setLoading(true);
-        const response = await publicPlansApi.getPlans({ limit: 50, sort: "latest" });
+        const response = await publicPlansApi.getPlans({ limit: 12, sort: "latest" });
         if (!alive) return;
         setPlans(response.plans ?? []);
       } catch (err) {
@@ -124,13 +124,16 @@ export default function Home() {
       .slice(0, 6);
   }, [plans]);
 
-  const randomPopularPlans = useMemo(() => {
-    const shuffled = [...plans].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 6);
-  }, [plans]);
+  const visibleBestPlans = useMemo(() => {
+    const shuffled = [...latestPlans];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [latestPlans]);
 
   const visibleFeaturedPlans = latestPlans;
-  const visibleBestPlans = randomPopularPlans.length > 0 ? randomPopularPlans : latestPlans;
   const categories = useMemo(() => collectPlanCategories(plans), [plans]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -145,7 +148,9 @@ export default function Home() {
           <ImageWithFallback
             src={HERO_BACKGROUND}
             alt="Modern architecture"
-            className="w-full h-full object-cover object-center"
+            loading="eager"
+            fetchPriority="high"
+            className="w-full h-full object-cover object-center scale-105 blur-[2px] brightness-75"
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-primary/40 to-slate-950/70" />

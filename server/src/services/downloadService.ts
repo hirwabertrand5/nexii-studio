@@ -11,6 +11,21 @@ function getDownloadSecret() {
   return secret;
 }
 
+export function verifyDownloadToken(token: string) {
+  const payload = jwt.verify(token, getDownloadSecret()) as {
+    type?: string;
+    userId?: string;
+    orderId?: string;
+    planId?: string;
+  };
+
+  if (payload.type !== "plan-download" || !payload.userId || !payload.orderId || !payload.planId) {
+    throw new AppError("Invalid download token", 401);
+  }
+
+  return payload as { userId: string; orderId: string; planId: string };
+}
+
 export async function prepareSecureDownload(userId: string, planId: string) {
   const order = await Order.findOne({
     user: userId,
@@ -29,18 +44,31 @@ export async function prepareSecureDownload(userId: string, planId: string) {
     throw new AppError("Plan is unavailable for download", 404);
   }
 
+  const downloadToken = jwt.sign(
+    {
+      type: "plan-download",
+      userId,
+      orderId: String(order._id),
+      planId
+    },
+    getDownloadSecret(),
+    { expiresIn: "15m" }
+  );
+
   const downloadFiles = plan.digitalFiles.length > 0
     ? plan.digitalFiles.map((file) => ({
         label: file.label,
         fileName: file.fileName,
         contentType: file.contentType ?? "application/octet-stream",
-        sizeInBytes: file.sizeInBytes ?? null
+        sizeInBytes: file.sizeInBytes ?? null,
+        downloadUrl: `/api/downloads/${plan._id}/files/${encodeURIComponent(file.fileName)}?token=${downloadToken}`
       }))
     : plan.filesIncluded.map((fileName) => ({
         label: fileName,
         fileName,
         contentType: "application/octet-stream",
-        sizeInBytes: null
+        sizeInBytes: null,
+        downloadUrl: null
       }));
 
   const bundleName = `${plan.title} secure bundle`;
@@ -63,17 +91,6 @@ export async function prepareSecureDownload(userId: string, planId: string) {
       }
     },
     { upsert: true, new: true }
-  );
-
-  const downloadToken = jwt.sign(
-    {
-      type: "plan-download",
-      userId,
-      orderId: String(order._id),
-      planId
-    },
-    getDownloadSecret(),
-    { expiresIn: "15m" }
   );
 
   return {

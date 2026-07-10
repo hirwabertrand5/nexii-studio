@@ -140,14 +140,40 @@ export async function createCheckoutOrder(userId: string, input: ReturnType<type
   }));
 
   const totalAmount = orderPlans.reduce((sum, item) => sum + item.price, 0);
+  const planObjectIds = orderPlans.map((item) => item.plan);
+
+  const existingPaidOrder = await Order.findOne({
+    user: toObjectId(userId),
+    paymentStatus: "paid",
+    downloadAccess: true,
+    "plans.plan": { $in: planObjectIds }
+  });
+
+  if (existingPaidOrder) {
+    throw new AppError("You already purchased one or more selected plans", 409);
+  }
+
+  const reusableOrder = await Order.findOne({
+    user: toObjectId(userId),
+    paymentMethod: input.paymentMethod,
+    currency: input.currency,
+    totalAmount,
+    paymentStatus: { $in: ["awaiting_payment", "pending", "failed"] },
+    orderStatus: { $ne: "cancelled" },
+    "plans.plan": { $all: planObjectIds }
+  }).sort({ createdAt: -1 });
+
+  if (reusableOrder && reusableOrder.plans.length === orderPlans.length) {
+    return Order.findById(reusableOrder._id).populate("plans.plan", "title images previewImages category architecturalStyle");
+  }
 
   const order = await Order.create({
     user: toObjectId(userId),
     plans: orderPlans,
     totalAmount,
     paymentMethod: input.paymentMethod,
-    paymentStatus: "pending",
-    orderStatus: "processing",
+    paymentStatus: "awaiting_payment",
+    orderStatus: "awaiting_payment",
     downloadAccess: false,
     transactionReference: generateTransactionReference(),
     currency: input.currency

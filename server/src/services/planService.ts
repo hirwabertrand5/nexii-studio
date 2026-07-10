@@ -45,8 +45,8 @@ type PlanFilter = Record<string, any>;
 const PUBLIC_PLAN_FILTER: PlanFilter = { status: "published" };
 const MAX_LIMIT = 50;
 
-function stripPrivatePlanFields<T extends Record<string, unknown>>(plan: T) {
-  const { digitalFiles: _digitalFiles, filesIncluded: _filesIncluded, ...publicPlan } = plan;
+function stripPrivatePlanFields<T extends object>(plan: T) {
+  const { digitalFiles: _digitalFiles, filesIncluded: _filesIncluded, ...publicPlan } = plan as Record<string, unknown>;
   return publicPlan as Omit<T, "digitalFiles" | "filesIncluded">;
 }
 

@@ -123,8 +123,11 @@ export async function applyPaymentOutcome(outcome: PaymentOutcome) {
   }
 
   const isPaid = outcome.status === "paid";
-  const verificationStatus = isPaid ? "verified" : "failed";
+  const isRefunded = outcome.status === "refunded";
+  const isCancelled = outcome.status === "cancelled";
+  const verificationStatus = isPaid || isRefunded ? "verified" : "failed";
   const paymentDate = outcome.paymentDate ?? (isPaid ? new Date() : undefined);
+  const orderStatus = isPaid ? "completed" : isCancelled ? "cancelled" : "awaiting_payment";
 
   const updatedOrder = await Order.findByIdAndUpdate(
     order._id,
@@ -135,8 +138,8 @@ export async function applyPaymentOutcome(outcome: PaymentOutcome) {
       receiptUrl: outcome.receiptUrl,
       verificationStatus,
       paymentStatus: outcome.status,
-      orderStatus: isPaid ? "completed" : "processing",
-      downloadAccess: isPaid
+      orderStatus,
+      downloadAccess: isPaid && !isRefunded
     },
     { new: true, runValidators: true }
   );

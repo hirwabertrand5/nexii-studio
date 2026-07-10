@@ -12,7 +12,12 @@ import {
   verifyFlutterwaveWebhookSignature
 } from "../services/flutterwaveService.js";
 import { getBuyerTransactions } from "../services/paymentVerificationService.js";
-import { initializeStripePayment, constructStripeEvent, handleStripeWebhook } from "../services/stripeService.js";
+import {
+  initializeStripePayment,
+  constructStripeEvent,
+  handleStripeWebhook,
+  verifyStripePaymentIntent
+} from "../services/stripeService.js";
 import {
   createPayPalOrder as createPayPalOrderService,
   capturePayPalOrder as capturePayPalOrderService,
@@ -93,6 +98,16 @@ export async function createStripeIntent(req: Request, res: Response) {
   const orderId = bodyOrderId(req.body);
   const payment = await initializeStripePayment(orderId, userId);
   return sendSuccess(res, { payment }, 201);
+}
+
+export async function verifyStripeIntent(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  const paymentIntentId = requiredString((req.body ?? {}).paymentIntentId, "paymentIntentId");
+  const orderId = typeof (req.body ?? {}).orderId === "string" ? (req.body ?? {}).orderId : undefined;
+  const result = await verifyStripePaymentIntent(paymentIntentId, userId, orderId);
+  return sendSuccess(res, result);
 }
 
 export async function createPayPalOrder(req: Request, res: Response) {
