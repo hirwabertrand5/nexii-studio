@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyAccessToken, verifyRefreshToken, createRefreshToken, revokeRefreshToken, generateAccessToken } from "../utils/generateToken.js";
+import { getAuthCookieOptions } from "../utils/cookieOptions.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 
 const ACCESS_COOKIE = "access_token";
@@ -22,8 +23,8 @@ async function tryRefresh(req: Request, res: Response, next: NextFunction) {
   const newRaw = await createRefreshToken(String((doc as any).user._id), req.ip, String(req.headers["user-agent"] ?? ""));
   const access = generateAccessToken({ userId: String((doc as any).user._id), role: (doc as any).user.role });
 
-  res.cookie(ACCESS_COOKIE, access, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 15 * 60 * 1000 });
-  res.cookie(REFRESH_COOKIE, newRaw, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie(ACCESS_COOKIE, access, getAuthCookieOptions(15 * 60 * 1000));
+  res.cookie(REFRESH_COOKIE, newRaw, getAuthCookieOptions(7 * 24 * 60 * 60 * 1000));
 
   req.auth = { userId: String((doc as any).user._id), role: (doc as any).user.role };
   return next();

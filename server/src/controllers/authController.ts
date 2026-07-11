@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { generateAccessToken, createRefreshToken, verifyRefreshToken, revokeRefreshToken } from "../utils/generateToken.js";
 import { sendMessage, sendSuccess } from "../utils/apiResponse.js";
+import { getAuthCookieOptions } from "../utils/cookieOptions.js";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -93,21 +94,9 @@ export async function registerVerify(req: Request, res: Response) {
   const accessMaxAge = 15 * 60 * 1000; // 15 minutes
   const refreshMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-  res.cookie("access_token", access, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: accessMaxAge
-  });
+  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
 
-  res.cookie("refresh_token", refreshRaw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: refreshMaxAge
-  });
+  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
 
   return sendSuccess(res, { user: sanitizeUser(user) });
 }
@@ -172,21 +161,9 @@ export async function loginVerify(req: Request, res: Response) {
   const accessMaxAge = 15 * 60 * 1000; // 15 minutes
   const refreshMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-  res.cookie("access_token", access, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: accessMaxAge
-  });
+  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
 
-  res.cookie("refresh_token", refreshRaw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: refreshMaxAge
-  });
+  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
 
   return sendSuccess(res, { user: sanitizeUser(user) });
 }
@@ -203,21 +180,9 @@ export async function refreshTokenHandler(req: Request, res: Response) {
   const newRaw = await createRefreshToken(String((doc as any).user._id), req.ip, String(req.headers["user-agent"] ?? ""));
   const access = generateAccessToken({ userId: String((doc as any).user._id), role: (doc as any).user.role });
 
-  res.cookie("access_token", access, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 15 * 60 * 1000
-  });
+  res.cookie("access_token", access, getAuthCookieOptions(15 * 60 * 1000));
 
-  res.cookie("refresh_token", newRaw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+  res.cookie("refresh_token", newRaw, getAuthCookieOptions(7 * 24 * 60 * 60 * 1000));
 
   const user = await User.findById(String((doc as any).user._id));
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
@@ -282,21 +247,9 @@ export async function adminLogin(req: Request, res: Response) {
   const accessMaxAge = 15 * 60 * 1000;
   const refreshMaxAge = 7 * 24 * 60 * 60 * 1000;
 
-  res.cookie("access_token", access, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: accessMaxAge
-  });
+  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
 
-  res.cookie("refresh_token", refreshRaw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: refreshMaxAge
-  });
+  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
 
   return sendSuccess(res, { user: sanitizeUser(user) });
 }
@@ -390,21 +343,9 @@ export async function googleLogin(req: Request, res: Response) {
   const accessMaxAge = 15 * 60 * 1000; // 15 minutes
   const refreshMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-  res.cookie("access_token", access, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: accessMaxAge
-  });
+  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
 
-  res.cookie("refresh_token", refreshRaw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: refreshMaxAge
-  });
+  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
 
   return sendSuccess(res, { user: sanitizeUser(user) });
 }
