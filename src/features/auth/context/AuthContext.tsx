@@ -1,16 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "../types";
-import { apiLoginChallenge, apiLoginVerify, apiLogout, apiMe, apiRegisterChallenge, apiRegisterVerify, apiGoogleLogin, apiUpdateMe, apiAdminLogin } from "../api/authApi";
-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+import { apiLogout, apiMe, apiGoogleLogin, apiUpdateMe, apiAdminLogin } from "../api/authApi";
 
 type AuthState = {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login(input: { email: string }): Promise<AuthUser>;
   adminLogin(input: { email: string; password: string }): Promise<AuthUser>;
   googleLogin(token: string): Promise<AuthUser>;
-  register(input: { fullName: string; email: string; country?: string }): Promise<AuthUser>;
   updateProfile(input: { fullName?: string; country?: string | null; avatarUrl?: string | null }): Promise<AuthUser>;
   logout(): Promise<void>;
   refresh(): Promise<AuthUser | null>;
@@ -24,6 +21,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = async () => {
     const res = await apiMe();
+    if (!res) {
+      setUser(null);
+      return null;
+    }
     setUser(res.user);
     return res.user;
   };
@@ -52,35 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(res.user);
         return res.user;
       },
-      async login(input) {
-        // Step 1: ask server for challenge
-        const challengeRes = await apiLoginChallenge({ email: input.email });
-        const options = challengeRes.options;
-        const userId = challengeRes.userId;
-
-        // Step 2: trigger native auth prompt
-        const assertion = await startAuthentication(options);
-
-        // Step 3: verify with server (server will set cookies)
-        const res = await apiLoginVerify({ ...assertion, id: userId });
-
-        // Step 4: refresh user state
-        setUser(res.user);
-        return res.user;
-      },
       async adminLogin(input) {
         const res = await apiAdminLogin(input);
-        setUser(res.user);
-        return res.user;
-      },
-      async register(input) {
-        const challengeRes = await apiRegisterChallenge({ fullName: input.fullName, email: input.email, country: input.country });
-        const options = challengeRes.options;
-        const userId = challengeRes.userId;
-
-        const attestation = await startRegistration(options);
-        const res = await apiRegisterVerify({ ...attestation, id: userId });
-
         setUser(res.user);
         return res.user;
       },

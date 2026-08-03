@@ -27,6 +27,14 @@ dotenv.config();
 
 export function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
+  const uploadStaticOptions = {
+    maxAge: "365d",
+    immutable: true,
+    setHeaders: (res: express.Response) => {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  };
 
   // Security middleware
   app.use(
@@ -84,8 +92,8 @@ export function createApp() {
   const serverUploadsDir = path.resolve(process.cwd(), "uploads");
   fs.mkdirSync(uploadsDir, { recursive: true });
   fs.mkdirSync(serverUploadsDir, { recursive: true });
-  app.use("/uploads", express.static(uploadsDir));
-  app.use("/uploads", express.static(serverUploadsDir));
+  app.use("/uploads", express.static(uploadsDir, uploadStaticOptions));
+  app.use("/uploads", express.static(serverUploadsDir, uploadStaticOptions));
 
   // Auth routes
   app.use("/api/auth", authRoutes);

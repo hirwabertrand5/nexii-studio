@@ -1,8 +1,5 @@
 import { Link, useNavigate } from "react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
 import { Card, CardContent } from "@/shared/ui/card";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
@@ -13,29 +10,13 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, user, isLoading, googleLogin } = useAuth();
-  const [email, setEmail] = useState("");
+  const { user, isLoading, googleLogin } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
     if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
   }, [isLoading, navigate, user]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setIsSubmitting(true);
-    try {
-      const user = await login({ email });
-      toast.success("Welcome back!");
-      navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Login failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleGoogleSuccess = useCallback(
     async (res: any) => {
@@ -48,7 +29,12 @@ export default function Login() {
         toast.success("Signed in with Google");
         navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Google login failed");
+        const message = err instanceof Error && /origin is not allowed/i.test(err.message)
+          ? "Google sign-in is not enabled for this domain yet. Add this domain in Google Cloud Console."
+          : err instanceof Error
+            ? err.message
+            : "Google login failed";
+        toast.error(message);
       } finally {
         setIsSubmitting(false);
       }
@@ -61,92 +47,55 @@ export default function Login() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 px-4">
-
-      <Card className="w-full max-w-md shadow-2xl border border-slate-200">
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4 py-10">
+      <Card className="mx-auto w-full max-w-md border border-slate-200 shadow-2xl shadow-slate-300/30">
         <CardContent className="p-8">
-
-          {/* Logo + Brand */}
-          <div className="flex flex-col items-center text-center mb-8">
-
-            <img
-              src={logo}
-              alt="NEXii Studio logo"
-              className="h-12 mb-3"
-            />
-
-            <h2 className="text-xl font-semibold text-slate-800">
-              Login to your account
-            </h2>
-
-           
+          <div className="mb-8 flex flex-col items-center text-center">
+            <img src={logo} alt="NEXii Studio logo" className="mb-3 h-12" />
+            <h2 className="text-xl font-semibold text-slate-800">Continue with Google</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Buyer accounts use Google only. Admin access stays on the separate admin login.
+            </p>
           </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full font-semibold"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Signing in..." : "Sign In"}
-            </Button>
-
-          </form>
-
-          <p className="mt-3 text-center text-xs text-slate-500">
-            We use your email to start a passkey sign-in.
-          </p>
-
           {googleClientId ? (
-            <div className="mt-4">
-              <div className="text-center text-sm text-slate-500 mb-3">Or continue with</div>
-              <div className="flex justify-center">
-                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+            <div className="mt-2">
+              <div className={`flex justify-center ${isSubmitting ? "pointer-events-none opacity-70" : ""}`}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  shape="pill"
+                  text="signin_with"
+                  locale="en"
+                />
               </div>
+              <p className="mt-4 text-center text-xs text-slate-500">
+                If Google blocks sign-in, add your domain to the OAuth client authorized origins.
+              </p>
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Google sign-in is not configured yet. Add <code>VITE_GOOGLE_CLIENT_ID</code> to enable buyer access.
+            </div>
+          )}
 
-          {/* Register Link */}
-          <div className="mt-6 text-center text-sm">
-
+          <div className="mt-6 space-y-2 text-center text-sm">
             <p className="text-muted-foreground">
               Don't have an account?{" "}
-              <Link
-                to="/register"
-                className="text-primary font-medium hover:underline"
-              >
-                Create account
+              <Link to="/register" className="font-medium text-primary hover:underline">
+                Sign up with Google
               </Link>
             </p>
-            <p className="mt-2 text-slate-500">
+            <p className="text-slate-500">
               Admin?{" "}
-              <Link to="/admin/login" className="text-primary font-medium hover:underline">
+              <Link to="/admin/login" className="font-medium text-primary hover:underline">
                 Sign in here
               </Link>
             </p>
-
           </div>
-
         </CardContent>
       </Card>
-
     </div>
   );
 }

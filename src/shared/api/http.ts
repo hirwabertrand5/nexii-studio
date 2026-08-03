@@ -1,9 +1,10 @@
-const fallbackApiUrl =
-  typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:5000`
-    : "http://127.0.0.1:5000";
+function normalizeBaseUrl(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/\/$/, "");
+}
 
-const API_URL = import.meta.env.VITE_API_URL ?? fallbackApiUrl;
+const API_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
 
 export class HttpError extends Error {
   status: number;

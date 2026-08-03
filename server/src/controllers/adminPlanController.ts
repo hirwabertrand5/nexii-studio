@@ -7,6 +7,7 @@ import { AdminActivityLog } from "../models/AdminActivityLog.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
+import { uploadBufferFile } from "../services/fileUploadService.js";
 
 type UploadFile = {
   buffer: Buffer;
@@ -23,7 +24,6 @@ type UploadedDigitalFile = {
   sizeInBytes?: number;
 };
 
-const publicUploadRoot = path.resolve(process.cwd(), "..", "uploads");
 const privateUploadRoot = path.resolve(process.cwd(), "private-uploads");
 const PRIVATE_FILE_LABELS = [
   "Architectural Plans",
@@ -32,12 +32,18 @@ const PRIVATE_FILE_LABELS = [
 ] as const;
 
 function getPublicBaseUrl() {
-  return (
-    process.env.PUBLIC_API_URL ||
-    process.env.BACKEND_URL ||
-    process.env.API_URL ||
+  const configuredBaseUrl = [
+    process.env.PUBLIC_API_URL,
+    process.env.BACKEND_URL,
+    process.env.API_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.RENDER_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.VITE_API_URL,
     `http://localhost:${process.env.PORT || 5000}`
-  ).replace(/\/$/, "");
+  ].find((value) => typeof value === "string" && value.trim() !== "");
+
+  return (configuredBaseUrl || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, "");
 }
 
 function pickString(...values: unknown[]) {
@@ -202,12 +208,12 @@ async function uploadPlanImages(files: UploadFile[]) {
       throw new AppError("Plan images must be image files", 400);
     }
 
-    const safeName = `${Date.now()}-${sanitizeFileName(file.originalname)}`;
-    const relativePath = path.posix.join("requests", safeName);
-    const absolutePath = path.join(publicUploadRoot, relativePath);
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, file.buffer);
-    urls.push(`${getPublicBaseUrl()}/uploads/${relativePath.replace(/\\/g, "/")}`);
+    const uploaded = await uploadBufferFile(file.buffer, file.originalname, file.mimetype, file.size, "inspiration");
+    if (!uploaded.url) {
+      throw new AppError("Image upload failed to produce a public URL", 500);
+    }
+
+    urls.push(uploaded.url);
   }
 
   return urls;

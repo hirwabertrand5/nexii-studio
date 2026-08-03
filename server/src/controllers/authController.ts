@@ -5,12 +5,6 @@ import { OAuth2Client } from "google-auth-library";
 import { generateAccessToken, createRefreshToken, verifyRefreshToken, revokeRefreshToken } from "../utils/generateToken.js";
 import { sendMessage, sendSuccess } from "../utils/apiResponse.js";
 import { getAuthCookieOptions } from "../utils/cookieOptions.js";
-import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse
-} from "@simplewebauthn/server";
 
 function sanitizeUser(u: { _id: unknown; fullName: string; email: string; role: "buyer" | "admin"; country?: string | null; createdAt?: Date; avatarUrl?: string | null }) {
   return {
@@ -24,148 +18,16 @@ function sanitizeUser(u: { _id: unknown; fullName: string; email: string; role: 
   };
 }
 
-function getRpId(req: Request) {
-  return process.env.WEBAUTHN_RP_ID ?? process.env.RP_ID ?? req.hostname;
-}
-
-function getOrigin(req: Request) {
-  return process.env.WEBAUTHN_ORIGIN ?? process.env.CORS_ORIGIN?.split(",")[0] ?? `${req.protocol}://${req.get("host")}`;
-}
-
-export async function registerChallenge(req: Request, res: Response) {
-  const { fullName, email, country } = req.body ?? {};
-  if (!fullName || !email) return res.status(400).json({ success: false, message: "fullName and email are required" });
-
-  const emailLc = String(email).toLowerCase();
-  let user = await User.findOne({ email: emailLc });
-  if (!user) {
-    user = await User.create({ fullName: String(fullName), email: emailLc, country: country ? String(country) : undefined });
-  } else if (country && !user.country) {
-    user.country = String(country);
-    await user.save();
-  }
-
-  const rpID = getRpId(req);
-  const options = generateRegistrationOptions({
-    rpName: process.env.WEBAUTHN_RP_NAME ?? "Nexii Studio",
-    rpID,
-    userID: String(user._id),
-    userName: user.email,
-    attestation: "none",
-    authenticatorSelection: { userVerification: "preferred" }
-  } as any);
-
-  user.currentChallenge = options.challenge;
-  await user.save();
-  return sendSuccess(res, { options, userId: String(user._id) } as any);
-}
-
-export async function registerVerify(req: Request, res: Response) {
-  const body = req.body ?? {};
-  const { id: userId } = body ?? {};
-  if (!userId) return res.status(400).json({ success: false, message: "user id required" });
-
-  const user = await User.findById(String(userId));
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-  const expectedOrigin = getOrigin(req);
-  const rpID = getRpId(req);
-
-  const verification = await verifyRegistrationResponse({ response: body, expectedChallenge: user.currentChallenge ?? "", expectedOrigin, expectedRPID: rpID } as any);
-
-  if (!verification.verified) return res.status(400).json({ success: false, message: "Registration verification failed" });
-
-  const regInfo = verification.registrationInfo;
-  if (!regInfo) return res.status(500).json({ success: false, message: "Missing registrationInfo" });
-
-  // Store credential using base64/base64url encodings
-  const credentialID = Buffer.from(regInfo.credentialID).toString("base64url");
-  const credentialPublicKey = Buffer.from(regInfo.credentialPublicKey).toString("base64");
-  user.credentials = user.credentials ?? [];
-  user.credentials.push({ credentialID, credentialPublicKey, counter: regInfo.counter, transports: (body?.transports as string[]) ?? [] });
-  user.currentChallenge = undefined;
-  await user.save();
-
-  // Issue cookies (access + refresh)
-  const access = generateAccessToken({ userId: String(user._id), role: user.role });
-  const refreshRaw = await createRefreshToken(String(user._id), req.ip, String(req.headers["user-agent"] ?? ""));
-
-  // Cookie settings: access short-lived, refresh long-lived
-  const accessMaxAge = 15 * 60 * 1000; // 15 minutes
-  const refreshMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
-
-  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
-
-  return sendSuccess(res, { user: sanitizeUser(user) });
-}
-
-export async function loginChallenge(req: Request, res: Response) {
-  const { email } = req.body ?? {};
-  if (!email) return res.status(400).json({ success: false, message: "email is required" });
-
-  const user = await User.findOne({ email: String(email).toLowerCase() });
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
-  if (!user.credentials || user.credentials.length === 0) return res.status(400).json({ success: false, message: "No credentials registered for this user" });
-
-  const rpID = getRpId(req);
-  const allowCredentials = user.credentials.map(c => ({ id: c.credentialID, type: "public-key", transports: c.transports }));
-  const options = generateAuthenticationOptions({ rpID, allowCredentials, userVerification: "preferred" });
-
-  user.currentChallenge = options.challenge;
-  await user.save();
-
-  return sendSuccess(res, { options, userId: String(user._id) } as any);
-}
-
-export async function loginVerify(req: Request, res: Response) {
-  const body = req.body ?? {};
-  const { id: userId } = body ?? {};
-  if (!userId) return res.status(400).json({ success: false, message: "user id required" });
-
-  const user = await User.findById(String(userId));
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-  const rpID = getRpId(req);
-  const expectedOrigin = getOrigin(req);
-
-  // Find credential used
-  const credId = (body?.id as string) ?? (body?.rawId as string) ?? undefined;
-  const credential = user.credentials.find(c => c.credentialID === credId);
-  if (!credential) return res.status(400).json({ success: false, message: "Unknown credential" });
-
-  const verification = await verifyAuthenticationResponse({
-    response: body,
-    expectedChallenge: user.currentChallenge ?? "",
-    expectedOrigin,
-    expectedRPID: rpID,
-    authenticator: {
-      credentialID: Buffer.from(credential.credentialID, "base64url"),
-      credentialPublicKey: Buffer.from(credential.credentialPublicKey, "base64"),
-      counter: credential.counter
-    }
-  } as any);
-
-  if (!verification.verified) return res.status(401).json({ success: false, message: "Authentication failed" });
-
-  // update counter
-  credential.counter = verification.authenticationInfo.newCounter;
-  user.currentChallenge = undefined;
-  await user.save();
-
-  // Issue cookies
-  const access = generateAccessToken({ userId: String(user._id), role: user.role });
-  const refreshRaw = await createRefreshToken(String(user._id), req.ip, String(req.headers["user-agent"] ?? ""));
-
-  const accessMaxAge = 15 * 60 * 1000; // 15 minutes
-  const refreshMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-  res.cookie("access_token", access, getAuthCookieOptions(accessMaxAge));
-
-  res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
-
-  return sendSuccess(res, { user: sanitizeUser(user) });
+function getGoogleClientIds() {
+  return [
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+    process.env.VITE_GOOGLE_CLIENT_ID
+  ]
+    .flatMap((value) => (value ? value.split(",") : []))
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 export async function refreshTokenHandler(req: Request, res: Response) {
@@ -294,13 +156,13 @@ export async function googleLogin(req: Request, res: Response) {
   const { idToken } = req.body ?? {};
   if (!idToken) return res.status(400).json({ success: false, message: "idToken is required" });
 
-  const clientId = process.env.GOOGLE_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.VITE_GOOGLE_CLIENT_ID;
-  if (!clientId) return res.status(500).json({ success: false, message: "Google client ID not configured on server" });
+  const clientIds = getGoogleClientIds();
+  if (clientIds.length === 0) return res.status(500).json({ success: false, message: "Google client ID not configured on server" });
 
-  const client = new OAuth2Client(clientId);
+  const client = new OAuth2Client(clientIds[0]);
   let payload: any;
   try {
-    const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+    const ticket = await client.verifyIdToken({ idToken, audience: clientIds });
     payload = ticket.getPayload();
   } catch (err) {
     return res.status(401).json({ success: false, message: "Invalid Google ID token" });

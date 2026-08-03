@@ -1,11 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
 import { Card, CardContent } from "@/shared/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { countries } from "@/shared/data/countries";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -15,38 +10,13 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, user, isLoading, googleLogin } = useAuth();
+  const { user, isLoading, googleLogin } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
     if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
   }, [isLoading, navigate, user]);
-
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    country: "",
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setIsSubmitting(true);
-    try {
-      const user = await register({
-        fullName: formData.name,
-        email: formData.email,
-        country: formData.country || undefined
-      });
-      toast.success("Account created successfully!");
-      navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Registration failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleGoogleSuccess = useCallback(
     async (res: any) => {
@@ -56,10 +26,15 @@ export default function Register() {
       setIsSubmitting(true);
       try {
         const user = await googleLogin(credential);
-        toast.success("Signed in with Google");
+        toast.success("Account ready");
         navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Google login failed");
+        const message = err instanceof Error && /origin is not allowed/i.test(err.message)
+          ? "Google sign-in is not enabled for this domain yet. Add this domain in Google Cloud Console."
+          : err instanceof Error
+            ? err.message
+            : "Google login failed";
+        toast.error(message);
       } finally {
         setIsSubmitting(false);
       }
@@ -71,123 +46,48 @@ export default function Register() {
     toast.error("Google sign-in failed");
   }, []);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
   return (
-    <div className="bg-gradient-to-br from-slate-100 to-slate-200 px-4 py-12 flex justify-center">
-
-      <Card className="w-full max-w-md shadow-2xl border border-slate-200">
-
+    <div className="flex min-h-screen justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4 py-12">
+      <Card className="w-full max-w-md border border-slate-200 shadow-2xl shadow-slate-300/30">
         <CardContent className="p-8">
-
-          {/* Logo */}
-          <div className="flex flex-col items-center text-center mb-8">
-
-            <img
-              src={logo}
-              alt="NEXii Studio logo"
-              className="h-12 mb-3"
-            />
-
-            <h2 className="text-xl font-semibold text-slate-800">
-              Create your account
-            </h2>
-
-
-
+          <div className="mb-8 flex flex-col items-center text-center">
+            <img src={logo} alt="NEXii Studio logo" className="mb-3 h-12" />
+            <h2 className="text-xl font-semibold text-slate-800">Sign up with Google</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Buyer accounts now use Google only. Admin access stays separate.
+            </p>
           </div>
-
-          {/* Register Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-
-              <Input
-                id="name"
-                required
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="your full name "
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-
-              <Input
-                id="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-
-              <Select
-                value={formData.country}
-                onValueChange={(value) => handleChange("country", value)}
-              >
-                <SelectTrigger id="country">
-                  <SelectValue placeholder="Select your country" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {countries.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-
-              </Select>
-            </div>
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full font-semibold"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Creating..." : "Create Account"}
-            </Button>
-
-          </form>
-
-          <p className="mt-3 text-center text-xs text-slate-500">
-            Registration uses your email and creates a passkey, not a password.
-          </p>
 
           {googleClientId ? (
-            <div className="mt-4">
-              <div className="text-center text-sm text-slate-500 mb-3">Or continue with</div>
-              <div className="flex justify-center">
-                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+            <div className="mt-2">
+              <div className={`flex justify-center ${isSubmitting ? "pointer-events-none opacity-70" : ""}`}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  shape="pill"
+                  text="signup_with"
+                  locale="en"
+                />
               </div>
+              <p className="mt-4 text-center text-xs text-slate-500">
+                If Google blocks sign-in, add your domain to the OAuth client authorized origins.
+              </p>
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Google sign-in is not configured yet. Add <code>VITE_GOOGLE_CLIENT_ID</code> to enable buyer access.
+            </div>
+          )}
 
-          {/* Login link */}
           <div className="mt-6 text-center text-sm">
-
             <p className="text-muted-foreground">
               Already have an account?{" "}
-              <Link
-                to="/login"
-                className="text-primary font-medium hover:underline"
-              >
-                Sign in
+              <Link to="/login" className="font-medium text-primary hover:underline">
+                Continue with Google
               </Link>
             </p>
-
           </div>
-
         </CardContent>
       </Card>
     </div>

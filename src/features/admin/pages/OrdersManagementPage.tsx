@@ -68,7 +68,7 @@ export default function OrdersManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -141,8 +141,8 @@ export default function OrdersManagement() {
       </Card>
 
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="overflow-x-auto p-0">
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>#</TableHead>
