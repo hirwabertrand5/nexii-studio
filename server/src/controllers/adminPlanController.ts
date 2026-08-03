@@ -202,21 +202,24 @@ async function uploadPlanImages(files: UploadFile[]) {
     throw new AppError("You can upload a maximum of 5 images", 400);
   }
 
-  const urls: string[] = [];
-  for (const file of files) {
+  const validations = files.map((file) => {
     if (!file.mimetype?.startsWith("image/")) {
       throw new AppError("Plan images must be image files", 400);
     }
+    return file;
+  });
 
-    const uploaded = await uploadBufferFile(file.buffer, file.originalname, file.mimetype, file.size, "inspiration");
-    if (!uploaded.url) {
-      throw new AppError("Image upload failed to produce a public URL", 500);
-    }
+  const uploads = await Promise.all(
+    validations.map(async (file) => {
+      const uploaded = await uploadBufferFile(file.buffer, file.originalname, file.mimetype, file.size, "inspiration");
+      if (!uploaded.url) {
+        throw new AppError("Image upload failed to produce a public URL", 500);
+      }
+      return uploaded.url;
+    })
+  );
 
-    urls.push(uploaded.url);
-  }
-
-  return urls;
+  return uploads;
 }
 
 async function uploadPrivateDigitalFiles(files: UploadFile[], labels: string[]): Promise<UploadedDigitalFile[]> {
@@ -228,23 +231,22 @@ async function uploadPrivateDigitalFiles(files: UploadFile[], labels: string[]):
   const uploadsDir = path.join(privateUploadRoot, "plan-files");
   await fs.mkdir(uploadsDir, { recursive: true });
 
-  const results: UploadedDigitalFile[] = [];
-  for (const [index, file] of files.entries()) {
-    const label = (labels[index] ?? PRIVATE_FILE_LABELS[index] ?? `Private File ${index + 1}`).trim();
-    const safeName = `${Date.now()}-${index + 1}-${sanitizeFileName(file.originalname)}`;
-    const storageKey = `private://plan-files/${safeName}`;
-    await fs.writeFile(path.join(uploadsDir, safeName), file.buffer);
+  return Promise.all(
+    files.map(async (file, index) => {
+      const label = (labels[index] ?? PRIVATE_FILE_LABELS[index] ?? `Private File ${index + 1}`).trim();
+      const safeName = `${Date.now()}-${index + 1}-${sanitizeFileName(file.originalname)}`;
+      const storageKey = `private://plan-files/${safeName}`;
+      await fs.writeFile(path.join(uploadsDir, safeName), file.buffer);
 
-    results.push({
-      label,
-      fileName: file.originalname,
-      storageKey,
-      contentType: file.mimetype,
-      sizeInBytes: file.size
-    });
-  }
-
-  return results;
+      return {
+        label,
+        fileName: file.originalname,
+        storageKey,
+        contentType: file.mimetype,
+        sizeInBytes: file.size
+      };
+    })
+  );
 }
 
 async function buildCreatePayload(

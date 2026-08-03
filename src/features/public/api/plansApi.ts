@@ -23,6 +23,18 @@ function withQuery(path: string, params?: Record<string, unknown>) {
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80";
+const apiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
+
+function getUploadsBaseUrl() {
+  if (apiBaseUrl) return apiBaseUrl;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
+function resolveUploadsPath(pathname: string) {
+  const base = getUploadsBaseUrl();
+  return base ? `${base}${pathname}` : pathname;
+}
 
 export const SUPPORTED_PLAN_CATEGORIES = [
   { value: "bungalow", label: "Bungalow" },
@@ -95,30 +107,22 @@ export function resolvePlanImageUrl(src?: string | null) {
   if (!value) return fallbackImage;
 
   if (/^https?:\/\//i.test(value)) {
-    try {
-      const url = new URL(value);
-      if (url.pathname.startsWith("/uploads/")) {
-        return `${url.pathname}${url.search}${url.hash}`;
-      }
-      return value;
-    } catch {
-      // fall through to relative path handling
-    }
+    return value;
   }
 
   if (value.startsWith("local://")) {
-    return `/uploads/${value.replace("local://", "").replace(/^\/+/, "")}`;
+    return resolveUploadsPath(`/uploads/${value.replace("local://", "").replace(/^\/+/, "")}`);
   }
   if (value.startsWith("private://") || value.startsWith("cloudinary://") || value.startsWith("s3://")) {
     return fallbackImage;
   }
   if (value.startsWith("uploads/")) {
-    return `/${value.replace(/^\/+/, "")}`;
+    return resolveUploadsPath(`/${value.replace(/^\/+/, "")}`);
   }
   if (value.startsWith("server/uploads/")) {
-    return `/uploads/${value.replace(/^server\/uploads\//, "")}`;
+    return resolveUploadsPath(`/uploads/${value.replace(/^server\/uploads\//, "")}`);
   }
-  if (value.startsWith("/uploads/")) return value;
+  if (value.startsWith("/uploads/")) return resolveUploadsPath(value);
   if (value.startsWith("/")) return value;
   if (/^(data:|blob:)/i.test(value)) return value;
   return fallbackImage;

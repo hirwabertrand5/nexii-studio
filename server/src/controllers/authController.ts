@@ -30,6 +30,42 @@ function getGoogleClientIds() {
     .filter(Boolean);
 }
 
+function getFrontendUrl() {
+  const explicitUrl = [
+    process.env.FRONTEND_URL,
+    process.env.PUBLIC_FRONTEND_URL,
+    process.env.NEXT_PUBLIC_FRONTEND_URL,
+    process.env.VITE_FRONTEND_URL
+  ]
+    .find((value) => typeof value === "string" && value.trim() !== "")
+    ?.trim()
+    .replace(/\/$/, "");
+
+  if (explicitUrl) return explicitUrl;
+
+  const corsOrigin = process.env.CORS_ORIGIN?.split(",").map((value) => value.trim()).find(Boolean);
+  return corsOrigin ? corsOrigin.replace(/\/$/, "") : "";
+}
+
+function isFormPost(req: Request) {
+  const contentType = String(req.headers["content-type"] ?? "").toLowerCase();
+  return contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data");
+}
+
+function getGoogleCredential(body: Record<string, unknown>) {
+  const token = body.idToken ?? body.credential ?? body.id_token;
+  return typeof token === "string" ? token.trim() : "";
+}
+
+function sendAuthResponse(req: Request, res: Response, user: ReturnType<typeof sanitizeUser>) {
+  const frontendUrl = getFrontendUrl();
+  if (isFormPost(req) && frontendUrl) {
+    return res.redirect(303, `${frontendUrl}/dashboard`);
+  }
+
+  return sendSuccess(res, { user });
+}
+
 export async function refreshTokenHandler(req: Request, res: Response) {
   const raw = req.cookies?.refresh_token;
   if (!raw) return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -153,7 +189,8 @@ export async function forgotPassword(_req: Request, res: Response) {
 }
 
 export async function googleLogin(req: Request, res: Response) {
-  const { idToken } = req.body ?? {};
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const idToken = getGoogleCredential(body);
   if (!idToken) return res.status(400).json({ success: false, message: "idToken is required" });
 
   const clientIds = getGoogleClientIds();
@@ -165,7 +202,10 @@ export async function googleLogin(req: Request, res: Response) {
     const ticket = await client.verifyIdToken({ idToken, audience: clientIds });
     payload = ticket.getPayload();
   } catch (err) {
-    return res.status(401).json({ success: false, message: "Invalid Google ID token" });
+    return res.status(401).json({
+      success: false,
+      message: "Google sign-in could not be verified. Make sure the same Google Client ID is configured in both frontend and backend production env vars, and that your production domain is authorized in Google Cloud Console."
+    });
   }
 
   if (!payload || !payload.email || !payload.sub) return res.status(400).json({ success: false, message: "Invalid token payload" });
@@ -209,5 +249,5 @@ export async function googleLogin(req: Request, res: Response) {
 
   res.cookie("refresh_token", refreshRaw, getAuthCookieOptions(refreshMaxAge));
 
-  return sendSuccess(res, { user: sanitizeUser(user) });
+  return sendAuthResponse(req, res, sanitizeUser(user));
 }

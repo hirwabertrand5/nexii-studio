@@ -81,6 +81,7 @@ export function createApp() {
       (req as express.Request).rawBody = Buffer.from(buf);
     }
   }));
+  app.use(express.urlencoded({ extended: false }));
 
   app.get("/health", (_req, res) => res.json({ success: true, data: { ok: true } }));
 

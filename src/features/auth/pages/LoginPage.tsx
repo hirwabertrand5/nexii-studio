@@ -1,50 +1,25 @@
 import { Link, useNavigate } from "react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent } from "@/shared/ui/card";
-import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
+function getGoogleLoginUri() {
+  const apiBase = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
+  return apiBase ? `${apiBase}/api/auth/google-login` : "/api/auth/google-login";
+}
+
 export default function Login() {
   const navigate = useNavigate();
-  const { user, isLoading, googleLogin } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (isLoading) return;
     if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
   }, [isLoading, navigate, user]);
-
-  const handleGoogleSuccess = useCallback(
-    async (res: any) => {
-      const credential = res?.credential;
-      if (!credential) return toast.error("Google sign-in failed");
-
-      setIsSubmitting(true);
-      try {
-        const user = await googleLogin(credential);
-        toast.success("Signed in with Google");
-        navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-      } catch (err) {
-        const message = err instanceof Error && /origin is not allowed/i.test(err.message)
-          ? "Google sign-in is not enabled for this domain yet. Add this domain in Google Cloud Console."
-          : err instanceof Error
-            ? err.message
-            : "Google login failed";
-        toast.error(message);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [googleLogin, navigate]
-  );
-
-  const handleGoogleError = useCallback(() => {
-    toast.error("Google sign-in failed");
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4 py-10">
@@ -60,10 +35,10 @@ export default function Login() {
 
           {googleClientId ? (
             <div className="mt-2">
-              <div className={`flex justify-center ${isSubmitting ? "pointer-events-none opacity-70" : ""}`}>
+              <div className="flex justify-center">
                 <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
+                  login_uri={getGoogleLoginUri()}
+                  ux_mode="redirect"
                   theme="outline"
                   shape="pill"
                   text="signin_with"
@@ -71,7 +46,7 @@ export default function Login() {
                 />
               </div>
               <p className="mt-4 text-center text-xs text-slate-500">
-                If Google blocks sign-in, add your domain to the OAuth client authorized origins.
+                Google redirects here after login, so production sessions can be set reliably.
               </p>
             </div>
           ) : (
