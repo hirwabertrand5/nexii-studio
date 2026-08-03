@@ -22,6 +22,7 @@ import { adminCustomRequestRoutes } from "./routes/adminCustomRequestRoutes.js";
 import { requestRoutes } from "./routes/requestRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorMiddleware.js";
 import { apiLimiter } from "./middleware/rateLimitMiddleware.js";
+import { getUploadStorageRoot } from "./utils/uploadStorage.js";
 
 dotenv.config();
 
@@ -88,13 +89,10 @@ export function createApp() {
   // Cookie parser for access/refresh cookies
   app.use(cookieParser());
 
-  // Serve locally uploaded files during development or when cloud storage is unavailable
-  const uploadsDir = path.resolve(process.cwd(), "..", "uploads");
-  const serverUploadsDir = path.resolve(process.cwd(), "uploads");
+  // Serve uploaded files from the shared storage root
+  const uploadsDir = getUploadStorageRoot();
   fs.mkdirSync(uploadsDir, { recursive: true });
-  fs.mkdirSync(serverUploadsDir, { recursive: true });
   app.use("/uploads", express.static(uploadsDir, uploadStaticOptions));
-  app.use("/uploads", express.static(serverUploadsDir, uploadStaticOptions));
 
   // Auth routes
   app.use("/api/auth", authRoutes);

@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs/promises";
 import path from "path";
+import { getPublicUploadBaseUrl, getUploadStorageRoot } from "../utils/uploadStorage.js";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || process.env.S3_REGION || "us-east-1",
@@ -13,25 +14,10 @@ const s3Client = new S3Client({
       : undefined
 });
 
-const localUploadRoot = path.resolve(process.cwd(), "..", "uploads");
-
-function getPublicBaseUrl() {
-  const configuredBaseUrl = [
-    process.env.PUBLIC_API_URL,
-    process.env.BACKEND_URL,
-    process.env.API_URL,
-    process.env.RENDER_EXTERNAL_URL,
-    process.env.RENDER_URL,
-    process.env.NEXT_PUBLIC_API_URL,
-    process.env.VITE_API_URL,
-    `http://localhost:${process.env.PORT || 5000}`
-  ].find((value) => typeof value === "string" && value.trim() !== "");
-
-  return (configuredBaseUrl || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, "");
-}
-
 function getUploadBaseUrl() {
-  return (process.env.PUBLIC_UPLOAD_BASE_URL || getPublicBaseUrl()).replace(/\/$/, "");
+  const configured = getPublicUploadBaseUrl();
+  if (configured) return configured;
+  return `http://localhost:${process.env.PORT || 5000}`;
 }
 
 function sanitizeFileName(name: string) {
@@ -41,7 +27,7 @@ function sanitizeFileName(name: string) {
 async function uploadToLocal(buffer: Buffer, originalName: string, subdir = "requests") {
   const safeName = `${Date.now()}-${sanitizeFileName(originalName)}`;
   const relativePath = path.posix.join(subdir, safeName);
-  const absolutePath = path.join(localUploadRoot, relativePath);
+  const absolutePath = path.join(getUploadStorageRoot(), relativePath);
 
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
   await fs.writeFile(absolutePath, buffer);
@@ -90,10 +76,6 @@ export async function uploadBufferFile(
   const hasS3 = Boolean(process.env.S3_BUCKET || process.env.AWS_S3_BUCKET);
 
   if (!hasS3) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Production uploads require S3-compatible storage. Set S3_BUCKET, AWS_S3_BUCKET, or PUBLIC_UPLOAD_BASE_URL.");
-    }
-
     const local = await uploadToLocal(buffer, originalName);
     return {
       fileName: originalName,

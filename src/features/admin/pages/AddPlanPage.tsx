@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useEffect, useRef, useState, type DragEvent } from "react";
+import { Link, useNavigate } from "react-router";
+import { ArrowLeft, FileText, Plus, Sparkles, Trash2, Upload, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
-import { ArrowLeft, Plus, Trash2, FileText } from "lucide-react";
-import { toast } from "sonner";
 import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
 import { adminPlansApi } from "../api/adminApi";
 
@@ -21,11 +21,7 @@ const PLAN_CATEGORY_OPTIONS = [
 ] as const;
 
 const MAX_IMAGES = 5;
-const PRIVATE_FILE_SLOTS = [
-  "Architectural Plans",
-  "Digital Drawings",
-  "Printable Delivery Package"
-] as const;
+const PRIVATE_FILE_SLOTS = ["Architectural Plans", "Digital Drawings", "Printable Delivery Package"] as const;
 const PRIVATE_FILE_ACCEPT = ".pdf,.dwg,.dxf,.zip,.rar,.doc,.docx,.png,.jpg,.jpeg,.webp";
 
 type PrivateFileEntry = {
@@ -61,9 +57,7 @@ function buildFormData(formData: Record<string, string>, imageFiles: File[], pri
       JSON.stringify(selectedPrivateFiles.map((entry, index) => entry.label.trim() || PRIVATE_FILE_SLOTS[index] || `Private File ${index + 1}`))
     );
     selectedPrivateFiles.forEach((entry) => {
-      if (entry.file) {
-        payload.append("digitalFiles", entry.file);
-      }
+      if (entry.file) payload.append("digitalFiles", entry.file);
     });
   }
 
@@ -79,10 +73,15 @@ function isDuplicateFile(existing: File[], nextFile: File) {
   );
 }
 
+function fieldClassName() {
+  return "bg-background";
+}
+
 export default function AddPlan() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [privateFiles, setPrivateFiles] = useState<PrivateFileEntry[]>(() => createPrivateFileEntries());
@@ -107,36 +106,6 @@ export default function AddPlan() {
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imageFiles]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name.trim() || !formData.category || !formData.description.trim()) {
-      toast.error("Title, category, and description are required");
-      return;
-    }
-
-    if (!formData.bedrooms || !formData.bathrooms || !formData.floors || !formData.area || !formData.plotSize || !formData.price) {
-      toast.error("Bedrooms, bathrooms, floors, area, plot size, and price are required");
-      return;
-    }
-
-    if (imageFiles.length === 0) {
-      toast.error("Please upload at least one image");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await adminPlansApi.createPlan(buildFormData(formData, imageFiles, privateFiles));
-      toast.success("House plan created successfully!");
-      setTimeout(() => navigate("/admin/plans"), 1200);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create plan");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -176,332 +145,455 @@ export default function AddPlan() {
     }
   };
 
+  const handleImageDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingImages(false);
+    addImages(event.dataTransfer.files);
+  };
+
   const removeImage = (index: number) => {
     setImageFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const updatePrivateFileLabel = (index: number, label: string) => {
-    setPrivateFiles((prev) => prev.map((entry, currentIndex) => currentIndex === index ? { ...entry, label } : entry));
+    setPrivateFiles((prev) => prev.map((entry, currentIndex) => (currentIndex === index ? { ...entry, label } : entry)));
   };
 
   const updatePrivateFile = (index: number, file: File | null) => {
-    setPrivateFiles((prev) => prev.map((entry, currentIndex) => currentIndex === index ? { ...entry, file } : entry));
+    setPrivateFiles((prev) => prev.map((entry, currentIndex) => (currentIndex === index ? { ...entry, file } : entry)));
+  };
+
+  const requiredFieldsFilled =
+    formData.name.trim() &&
+    formData.category.trim() &&
+    formData.description.trim() &&
+    formData.bedrooms.trim() &&
+    formData.bathrooms.trim() &&
+    formData.floors.trim() &&
+    formData.area.trim() &&
+    formData.plotSize.trim() &&
+    formData.price.trim();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim() || !formData.category.trim() || !formData.description.trim()) {
+      toast.error("Title, category, and description are required");
+      return;
+    }
+
+    if (!formData.bedrooms.trim() || !formData.bathrooms.trim() || !formData.floors.trim() || !formData.area.trim() || !formData.plotSize.trim() || !formData.price.trim()) {
+      toast.error("Bedrooms, bathrooms, floors, area, plot size, and price are required");
+      return;
+    }
+
+    if (imageFiles.length === 0) {
+      toast.error("Please upload at least one image");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await adminPlansApi.createPlan(buildFormData(formData, imageFiles, privateFiles));
+      toast.success("House plan created successfully");
+      setTimeout(() => navigate("/admin/plans"), 1000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create plan");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <Link to="/admin/plans">
           <Button variant="ghost" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Plans
           </Button>
         </Link>
+
+        <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary">
+          <Sparkles className="h-4 w-4" />
+          Fast create mode
+        </div>
       </div>
 
-      <div className="mb-8">
-        <h1 className="text-3xl mb-2">Add New House Plan</h1>
-        <p className="text-muted-foreground">Create a new house plan listing with real uploads</p>
-      </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+        <div className="space-y-6">
+          <Card className="border-slate-200/80 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-semibold tracking-tight">Add New House Plan</h1>
+                <p className="text-sm text-muted-foreground">
+                  Fill the essentials once, upload the gallery in seconds, and publish directly to visitors.
+                </p>
+              </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Plan Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <h3 className="font-semibold mb-4">Basic Information</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Plan Name *</Label>
-                      <Input
-                        id="name"
-                        required
-                        value={formData.name}
-                        onChange={(e) => handleChange("name", e.target.value)}
-                        placeholder="e.g., Modern African Villa"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="category">Category *</Label>
-                        <Input
-                          id="category"
-                          list="category-options"
-                          required
-                          value={formData.category}
-                          onChange={(e) => handleChange("category", e.target.value)}
-                          placeholder="e.g., bungalow, town house, luxury villa"
-                        />
-                        <datalist id="category-options">
-                          {PLAN_CATEGORY_OPTIONS.map((cat) => (
-                            <option key={cat.value} value={cat.label} />
-                          ))}
-                        </datalist>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          You can type a new category if the business adds one later.
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="style">Architectural Style *</Label>
-                        <Input
-                          id="style"
-                          required
-                          value={formData.style}
-                          onChange={(e) => handleChange("style", e.target.value)}
-                          placeholder="e.g., African Contemporary"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="description">Description *</Label>
-                      <Textarea
-                        id="description"
-                        required
-                        value={formData.description}
-                        onChange={(e) => handleChange("description", e.target.value)}
-                        placeholder="Describe the house plan..."
-                        rows={4}
-                      />
-                    </div>
-                  </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Core fields</p>
+                  <p className="mt-2 text-xl font-semibold">{requiredFieldsFilled ? "Ready" : "In progress"}</p>
                 </div>
-
-                <div>
-                  <h3 className="font-semibold mb-4">Specifications</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="bedrooms">Bedrooms *</Label>
-                      <Input
-                        id="bedrooms"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.bedrooms}
-                        onChange={(e) => handleChange("bedrooms", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="bathrooms">Bathrooms *</Label>
-                      <Input
-                        id="bathrooms"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.bathrooms}
-                        onChange={(e) => handleChange("bathrooms", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="floors">Floors *</Label>
-                      <Input
-                        id="floors"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.floors}
-                        onChange={(e) => handleChange("floors", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="area">Total Area (m²) *</Label>
-                      <Input
-                        id="area"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.area}
-                        onChange={(e) => handleChange("area", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="plotSize">Plot Size (m²) *</Label>
-                      <Input
-                        id="plotSize"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.plotSize}
-                        onChange={(e) => handleChange("plotSize", e.target.value)}
-                        placeholder="e.g., 450"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="price">Price (USD) *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        min="0"
-                        required
-                        value={formData.price}
-                        onChange={(e) => handleChange("price", e.target.value)}
-                      />
-                    </div>
-                  </div>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Images</p>
+                  <p className="mt-2 text-xl font-semibold">
+                    {imageFiles.length}/{MAX_IMAGES}
+                  </p>
                 </div>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Private files</p>
+                  <p className="mt-2 text-xl font-semibold">
+                    {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">Plan Images</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {imageFiles.length}/{MAX_IMAGES} selected
-                    </p>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Plan Name</Label>
+                    <Input
+                      id="name"
+                      className={fieldClassName()}
+                      value={formData.name}
+                      onChange={(e) => handleChange("name", e.target.value)}
+                      placeholder="e.g., Modern African Villa"
+                    />
                   </div>
 
-                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium">Upload plan images *</p>
-                        <p className="text-sm text-muted-foreground">
-                          Add up to {MAX_IMAGES} images. Choose more any time until the limit is reached.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          ref={fileInputRef}
-                          id="images"
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="max-w-xs"
-                          onChange={(e) => addImages(e.target.files)}
-                        />
-                        <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Images
-                        </Button>
-                      </div>
-                    </div>
-
-                    {previewUrls.length > 0 && (
-                      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {previewUrls.map((url, index) => (
-                          <div key={`${url}-${index}`} className="rounded-lg border bg-background overflow-hidden">
-                            <div className="aspect-[4/3] relative">
-                              <ImageWithFallback
-                                src={url}
-                                alt={`Selected image ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between gap-3 p-3">
-                              <p className="text-xs text-muted-foreground truncate">{imageFiles[index]?.name}</p>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => removeImage(index)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Input
+                        id="category"
+                        list="category-options"
+                        className={fieldClassName()}
+                        value={formData.category}
+                        onChange={(e) => handleChange("category", e.target.value)}
+                        placeholder="e.g., bungalow, town house, luxury villa"
+                      />
+                      <datalist id="category-options">
+                        {PLAN_CATEGORY_OPTIONS.map((cat) => (
+                          <option key={cat.value} value={cat.label} />
                         ))}
-                      </div>
-                    )}
+                      </datalist>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="style">Architectural Style</Label>
+                      <Input
+                        id="style"
+                        className={fieldClassName()}
+                        value={formData.style}
+                        onChange={(e) => handleChange("style", e.target.value)}
+                        placeholder="e.g., African Contemporary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      className={fieldClassName()}
+                      value={formData.description}
+                      onChange={(e) => handleChange("description", e.target.value)}
+                      placeholder="Describe the house plan..."
+                      rows={5}
+                    />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="font-semibold">Private Deliverables</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Upload buyer-only files here. They stay private until purchase.
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader>
+                <CardTitle>Specifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="bedrooms">Bedrooms</Label>
+                    <Input
+                      id="bedrooms"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.bedrooms}
+                      onChange={(e) => handleChange("bedrooms", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bathrooms">Bathrooms</Label>
+                    <Input
+                      id="bathrooms"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.bathrooms}
+                      onChange={(e) => handleChange("bathrooms", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="floors">Floors</Label>
+                    <Input
+                      id="floors"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.floors}
+                      onChange={(e) => handleChange("floors", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="area">Total Area (m²)</Label>
+                    <Input
+                      id="area"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.area}
+                      onChange={(e) => handleChange("area", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="plotSize">Plot Size (m²)</Label>
+                    <Input
+                      id="plotSize"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.plotSize}
+                      onChange={(e) => handleChange("plotSize", e.target.value)}
+                      placeholder="e.g., 450"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price (USD)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min="0"
+                      className={fieldClassName()}
+                      value={formData.price}
+                      onChange={(e) => handleChange("price", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle>Plan Images</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {imageFiles.length}/{MAX_IMAGES} selected
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDraggingImages(true);
+                  }}
+                  onDragLeave={() => setIsDraggingImages(false)}
+                  onDrop={handleImageDrop}
+                  className={`rounded-2xl border border-dashed p-5 transition-colors ${
+                    isDraggingImages ? "border-primary bg-primary/5" : "border-border bg-muted/20"
+                  }`}
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="flex items-center gap-2">
+                        <Upload className="h-4 w-4 text-primary" />
+                        <p className="font-medium">Drop plan images here or choose files</p>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Upload up to {MAX_IMAGES} images. They are shown instantly in the preview and stored on your backend for production.
                       </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length} selected
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        id="images"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => addImages(e.target.files)}
+                      />
+                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Images
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {previewUrls.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {previewUrls.map((url, index) => (
+                      <div key={`${url}-${index}`} className="overflow-hidden rounded-xl border bg-background">
+                        <div className="relative aspect-[4/3]">
+                          <ImageWithFallback
+                            src={url}
+                            alt={`Selected image ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="flex items-start justify-between gap-3 p-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{imageFiles[index]?.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {((imageFiles[index]?.size ?? 0) / (1024 * 1024)).toFixed(2)} MB
+                              </p>
+                          </div>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeImage(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border bg-background p-6 text-sm text-muted-foreground">
+                    No images selected yet. Choose at least one public image so visitors can preview the plan.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Private Deliverables</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Optional buyer-only files that stay hidden from visitors until purchase.
                     </p>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length} selected
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <details className="group rounded-xl border bg-muted/10 p-4">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+                    <FileText className="h-4 w-4 text-primary" />
+                    Advanced file uploads
+                  </summary>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
                     {privateFiles.map((entry, index) => (
-                      <div key={entry.label} className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                      <div key={entry.label} className="space-y-3 rounded-xl border bg-background p-4">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                          <FileText className="w-4 h-4 text-primary" />
+                          <ImageIcon className="h-4 w-4 text-primary" />
                           <span>File {index + 1}</span>
                         </div>
-                        <div>
+
+                        <div className="space-y-2">
                           <Label htmlFor={`private-file-label-${index}`}>Label</Label>
                           <Input
                             id={`private-file-label-${index}`}
                             value={entry.label}
+                            className={fieldClassName()}
                             onChange={(e) => updatePrivateFileLabel(index, e.target.value)}
                             placeholder={PRIVATE_FILE_SLOTS[index]}
                           />
                         </div>
-                        <div>
+
+                        <div className="space-y-2">
                           <Label htmlFor={`private-file-${index}`}>Upload file</Label>
                           <Input
                             id={`private-file-${index}`}
                             type="file"
                             accept={PRIVATE_FILE_ACCEPT}
+                            className={fieldClassName()}
                             onChange={(e) => {
                               updatePrivateFile(index, e.target.files?.[0] ?? null);
                               e.currentTarget.value = "";
                             }}
                           />
                         </div>
+
                         {entry.file ? (
-                          <div className="flex items-start justify-between gap-3 rounded-lg bg-background border border-border p-3">
+                          <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/20 p-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{entry.file.name}</p>
+                              <p className="truncate text-sm font-medium">{entry.file.name}</p>
                               <p className="text-xs text-muted-foreground">
                                 {(entry.file.size / (1024 * 1024)).toFixed(2)} MB
                               </p>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => updatePrivateFile(index, null)}
-                            >
-                              <Trash2 className="w-4 h-4" />
+                            <Button type="button" variant="ghost" size="sm" onClick={() => updatePrivateFile(index, null)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground">
-                            No file selected for this slot yet.
-                          </p>
+                          <p className="text-xs text-muted-foreground">No file selected for this slot yet.</p>
                         )}
                       </div>
                     ))}
                   </div>
-                </div>
+                </details>
+              </CardContent>
+            </Card>
 
-                <div className="flex gap-4">
-                  <Button type="submit" size="lg" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Add Plan"}
-                  </Button>
-                  <Link to="/admin/plans">
-                    <Button type="button" variant="outline" size="lg">
-                      Cancel
-                    </Button>
-                  </Link>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="submit" size="lg" disabled={isSubmitting}>
+                {isSubmitting ? "Publishing..." : "Publish Plan"}
+              </Button>
+              <Link to="/admin/plans">
+                <Button type="button" variant="outline" size="lg">
+                  Cancel
+                </Button>
+              </Link>
+            </div>
+          </form>
         </div>
 
-        <div className="lg:col-span-1">
-          <Card>
+        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          <Card className="border-slate-200/80 shadow-sm">
             <CardHeader>
-              <CardTitle>Plan Rules</CardTitle>
+              <CardTitle>Quick Rules</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>• Title, category, and description are required</li>
                 <li>• Bedrooms, bathrooms, floors, area, plot size, and price must be numbers</li>
-                <li>• At least one public image upload is required</li>
-                <li>• Private deliverables are optional and stay hidden from public pages</li>
+                <li>• At least one public image is required</li>
+                <li>• Private deliverables are optional and stay hidden from the visitor pages</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200/80 shadow-sm">
+            <CardHeader>
+              <CardTitle>Production Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li>• Images are uploaded in parallel for faster submission</li>
+                <li>• Public images are stored on the backend and served from your Render host</li>
+                <li>• For production, set your backend upload base URL to the Render domain</li>
+                <li>• Vercel should point to the Render API through `VITE_API_URL`</li>
               </ul>
             </CardContent>
           </Card>

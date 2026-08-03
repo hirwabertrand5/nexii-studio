@@ -1,25 +1,41 @@
 import { Link, useNavigate } from "react-router";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/shared/ui/card";
+import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
-function getGoogleLoginUri() {
-  const apiBase = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
-  return apiBase ? `${apiBase}/api/auth/google-login` : "/api/auth/google-login";
-}
-
 export default function Register() {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, googleLogin } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
     if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
   }, [isLoading, navigate, user]);
+
+  const handleGoogleSuccess = useCallback(
+    async (res: any) => {
+      const credential = res?.credential;
+      if (!credential) return toast.error("Google sign-in failed");
+
+      setIsSubmitting(true);
+      try {
+        const nextUser = await googleLogin(credential);
+        toast.success("Account ready");
+        navigate(nextUser.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Google login failed");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [googleLogin, navigate]
+  );
 
   return (
     <div className="flex min-h-screen justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4 py-12">
@@ -35,10 +51,10 @@ export default function Register() {
 
           {googleClientId ? (
             <div className="mt-2">
-              <div className="flex justify-center">
+              <div className={`flex justify-center ${isSubmitting ? "pointer-events-none opacity-70" : ""}`}>
                 <GoogleLogin
-                  login_uri={getGoogleLoginUri()}
-                  ux_mode="redirect"
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => toast.error("Google sign-in failed")}
                   theme="outline"
                   shape="pill"
                   text="signup_with"

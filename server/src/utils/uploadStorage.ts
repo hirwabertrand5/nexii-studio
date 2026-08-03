@@ -1,0 +1,40 @@
+import path from "path";
+
+function normalizePath(value: string) {
+  return value.replace(/\\/g, "/").replace(/\/$/, "");
+}
+
+export function getUploadStorageRoot() {
+  const configured = [
+    process.env.UPLOADS_DIR,
+    process.env.RENDER_DISK_MOUNT_PATH ? path.join(process.env.RENDER_DISK_MOUNT_PATH, "uploads") : undefined
+  ]
+    .find((value) => typeof value === "string" && value.trim() !== "")
+    ?.trim();
+
+  if (configured) {
+    return path.resolve(configured);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return path.resolve(process.cwd(), "uploads");
+  }
+
+  return path.resolve(process.cwd(), "..", "uploads");
+}
+
+export function getPublicUploadBaseUrl() {
+  const configuredBaseUrl = [
+    process.env.PUBLIC_UPLOAD_BASE_URL,
+    process.env.PUBLIC_API_URL,
+    process.env.BACKEND_URL,
+    process.env.API_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.RENDER_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.VITE_API_URL
+  ].find((value) => typeof value === "string" && value.trim() !== "");
+
+  return normalizePath((configuredBaseUrl || "").trim());
+}
+
