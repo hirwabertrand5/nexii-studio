@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
 import { uploadBufferFile } from "../services/fileUploadService.js";
+import { getRequestPublicBaseUrl } from "../utils/uploadStorage.js";
 
 // Create custom request
 export const createCustomRequest = asyncHandler(async (req: Request, res: Response) => {
@@ -192,7 +193,14 @@ export const uploadRequestFiles = asyncHandler(async (req: Request, res: Respons
     else if (/pdf|doc|docx|dwg|dgn/i.test(name)) fileType = "document";
     else if (/inspirat|image|jpg|jpeg|png|gif/i.test(name)) fileType = "inspiration";
 
-    const result = await uploadBufferFile(f.buffer, f.originalname, f.mimetype, f.size, fileType);
+    const result = await uploadBufferFile(
+      f.buffer,
+      f.originalname,
+      f.mimetype,
+      f.size,
+      fileType,
+      { publicBaseUrl: getRequestPublicBaseUrl(req) }
+    );
     request.uploadedFiles.push(result as any);
     uploadedResults.push(result);
   }

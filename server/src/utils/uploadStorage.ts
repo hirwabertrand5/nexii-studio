@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import path from "path";
 
 function normalizePath(value: string) {
@@ -45,4 +46,21 @@ export function getPublicUploadBaseUrl() {
   ].find((value) => typeof value === "string" && value.trim() !== "");
 
   return normalizePath((configuredBaseUrl || "").trim());
+}
+
+export function getRequestPublicBaseUrl(req: Request) {
+  const forwardedProto = typeof req.headers["x-forwarded-proto"] === "string"
+    ? req.headers["x-forwarded-proto"].split(",")[0]?.trim()
+    : undefined;
+  const forwardedHost = typeof req.headers["x-forwarded-host"] === "string"
+    ? req.headers["x-forwarded-host"].split(",")[0]?.trim()
+    : undefined;
+  const host = forwardedHost || req.get("host");
+  const proto = forwardedProto || (req.secure ? "https" : "http");
+
+  if (host) {
+    return normalizePath(`${proto}://${host}`);
+  }
+
+  return getPublicUploadBaseUrl() || `http://localhost:${process.env.PORT || 5000}`;
 }

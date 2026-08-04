@@ -8,7 +8,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
 import { uploadBufferFile } from "../services/fileUploadService.js";
-import { getPrivateUploadStorageRoot } from "../utils/uploadStorage.js";
+import { getPrivateUploadStorageRoot, getRequestPublicBaseUrl } from "../utils/uploadStorage.js";
 
 type UploadFile = {
   buffer: Buffer;
@@ -31,21 +31,6 @@ const PRIVATE_FILE_LABELS = [
   "Digital Drawings",
   "Printable Delivery Package"
 ] as const;
-
-function getPublicBaseUrl() {
-  const configuredBaseUrl = [
-    process.env.PUBLIC_API_URL,
-    process.env.BACKEND_URL,
-    process.env.API_URL,
-    process.env.RENDER_EXTERNAL_URL,
-    process.env.RENDER_URL,
-    process.env.NEXT_PUBLIC_API_URL,
-    process.env.VITE_API_URL,
-    `http://localhost:${process.env.PORT || 5000}`
-  ].find((value) => typeof value === "string" && value.trim() !== "");
-
-  return (configuredBaseUrl || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, "");
-}
 
 function pickString(...values: unknown[]) {
   for (const value of values) {
@@ -197,7 +182,7 @@ function parseDigitalFileLabels(value: unknown) {
     .filter(Boolean);
 }
 
-async function uploadPlanImages(files: UploadFile[]) {
+async function uploadPlanImages(files: UploadFile[], publicBaseUrl?: string) {
   if (!files.length) return [] as string[];
   if (files.length > 5) {
     throw new AppError("You can upload a maximum of 5 images", 400);
@@ -212,7 +197,14 @@ async function uploadPlanImages(files: UploadFile[]) {
 
   const uploads = await Promise.all(
     validations.map(async (file) => {
-      const uploaded = await uploadBufferFile(file.buffer, file.originalname, file.mimetype, file.size, "inspiration");
+      const uploaded = await uploadBufferFile(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        file.size,
+        "inspiration",
+        { publicBaseUrl }
+      );
       if (!uploaded.url) {
         throw new AppError("Image upload failed to produce a public URL", 500);
       }
@@ -254,7 +246,8 @@ async function buildCreatePayload(
   body: Record<string, unknown>,
   adminId: Types.ObjectId,
   imageFiles: UploadFile[],
-  digitalUploadFiles: UploadFile[]
+  digitalUploadFiles: UploadFile[],
+  publicBaseUrl?: string
 ) {
   const title = pickString(body.title, body.name);
   const description = pickString(body.description);
@@ -264,7 +257,7 @@ async function buildCreatePayload(
   if (!description) throw new AppError("description is required", 400);
   if (!architecturalStyle) throw new AppError("architecturalStyle is required", 400);
 
-  const uploadedImages = await uploadPlanImages(imageFiles);
+  const uploadedImages = await uploadPlanImages(imageFiles, publicBaseUrl);
   const images = uploadedImages.length > 0
     ? uploadedImages
     : parseStringArrayField(body.images ?? body.imageUrls ?? body.imageUrl, "images", { required: true }) ?? [];
@@ -306,7 +299,12 @@ async function buildCreatePayload(
   };
 }
 
-async function buildUpdatePayload(body: Record<string, unknown>, imageFiles: UploadFile[], digitalUploadFiles: UploadFile[]) {
+async function buildUpdatePayload(
+  body: Record<string, unknown>,
+  imageFiles: UploadFile[],
+  digitalUploadFiles: UploadFile[],
+  publicBaseUrl?: string
+) {
   const updates: Record<string, unknown> = {};
 
   const title = pickString(body.title, body.name);
@@ -331,7 +329,7 @@ async function buildUpdatePayload(body: Record<string, unknown>, imageFiles: Upl
     updates.category = parseCategoryField(body.category);
   }
 
-  const uploadedImages = await uploadPlanImages(imageFiles);
+  const uploadedImages = await uploadPlanImages(imageFiles, publicBaseUrl);
   if (uploadedImages.length > 0) {
     updates.images = uploadedImages;
     updates.previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages") ?? uploadedImages.slice(0, 3);
@@ -380,7 +378,8 @@ export const createPlan = asyncHandler(async (req: Request, res: Response) => {
     (req.body ?? {}) as Record<string, unknown>,
     adminId,
     getUploadedFieldFiles(req, "images"),
-    getUploadedFieldFiles(req, "digitalFiles")
+    getUploadedFieldFiles(req, "digitalFiles"),
+    getRequestPublicBaseUrl(req)
   );
   const plan = await HousePlan.create(payload);
 
@@ -452,7 +451,8 @@ export const updatePlan = asyncHandler(async (req: Request, res: Response) => {
   const updates = await buildUpdatePayload(
     (req.body ?? {}) as Record<string, unknown>,
     getUploadedFieldFiles(req, "images"),
-    getUploadedFieldFiles(req, "digitalFiles")
+    getUploadedFieldFiles(req, "digitalFiles"),
+    getRequestPublicBaseUrl(req)
   );
 
   Object.assign(plan, updates);

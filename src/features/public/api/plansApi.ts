@@ -36,6 +36,10 @@ function resolveUploadsPath(pathname: string) {
   return base ? `${base}${pathname}` : pathname;
 }
 
+function isLocalhostHost(hostname: string) {
+  return ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(hostname);
+}
+
 export const SUPPORTED_PLAN_CATEGORIES = [
   { value: "bungalow", label: "Bungalow" },
   { value: "duplex", label: "Duplex" },
@@ -107,6 +111,15 @@ export function resolvePlanImageUrl(src?: string | null) {
   if (!value) return fallbackImage;
 
   if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      if (isLocalhostHost(parsed.hostname) && parsed.pathname.startsWith("/uploads/")) {
+        return resolveUploadsPath(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+      }
+    } catch {
+      // Keep the original URL if parsing fails.
+    }
+
     return value;
   }
 

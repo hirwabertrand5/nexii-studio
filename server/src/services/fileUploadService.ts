@@ -14,8 +14,8 @@ const s3Client = new S3Client({
       : undefined
 });
 
-function getUploadBaseUrl() {
-  const configured = getPublicUploadBaseUrl();
+function getUploadBaseUrl(override?: string) {
+  const configured = override?.trim().replace(/\/$/, "") || getPublicUploadBaseUrl();
   if (configured) return configured;
   return `http://localhost:${process.env.PORT || 5000}`;
 }
@@ -24,7 +24,7 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }
 
-async function uploadToLocal(buffer: Buffer, originalName: string, subdir = "requests") {
+async function uploadToLocal(buffer: Buffer, originalName: string, subdir = "requests", publicBaseUrl?: string) {
   const safeName = `${Date.now()}-${sanitizeFileName(originalName)}`;
   const relativePath = path.posix.join(subdir, safeName);
   const absolutePath = path.join(getUploadStorageRoot(), relativePath);
@@ -34,7 +34,7 @@ async function uploadToLocal(buffer: Buffer, originalName: string, subdir = "req
 
   return {
     key: relativePath.replace(/\\/g, "/"),
-    url: `${getUploadBaseUrl()}/uploads/${relativePath.replace(/\\/g, "/")}`
+    url: `${getUploadBaseUrl(publicBaseUrl)}/uploads/${relativePath.replace(/\\/g, "/")}`
   };
 }
 
@@ -71,12 +71,13 @@ export async function uploadBufferFile(
   originalName: string,
   mimetype: string,
   sizeInBytes: number,
-  fileType: "sketch" | "document" | "inspiration" | "other" = "other"
+  fileType: "sketch" | "document" | "inspiration" | "other" = "other",
+  options?: { publicBaseUrl?: string }
 ): Promise<UploadedFileResult> {
   const hasS3 = Boolean(process.env.S3_BUCKET || process.env.AWS_S3_BUCKET);
 
   if (!hasS3) {
-    const local = await uploadToLocal(buffer, originalName);
+    const local = await uploadToLocal(buffer, originalName, "requests", options?.publicBaseUrl);
     return {
       fileName: originalName,
       storageKey: `local://${local.key}`,
