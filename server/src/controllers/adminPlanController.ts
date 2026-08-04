@@ -8,6 +8,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
 import { uploadBufferFile } from "../services/fileUploadService.js";
+import { getPrivateUploadStorageRoot } from "../utils/uploadStorage.js";
 
 type UploadFile = {
   buffer: Buffer;
@@ -24,7 +25,7 @@ type UploadedDigitalFile = {
   sizeInBytes?: number;
 };
 
-const privateUploadRoot = path.resolve(process.cwd(), "private-uploads");
+const privateUploadRoot = getPrivateUploadStorageRoot();
 const PRIVATE_FILE_LABELS = [
   "Architectural Plans",
   "Digital Drawings",

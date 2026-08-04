@@ -23,6 +23,15 @@ export function getUploadStorageRoot() {
   return path.resolve(process.cwd(), "..", "uploads");
 }
 
+export function getPrivateUploadStorageRoot() {
+  const configured = process.env.PRIVATE_UPLOADS_DIR?.trim();
+  if (configured) {
+    return path.resolve(configured);
+  }
+
+  return path.join(getUploadStorageRoot(), "private");
+}
+
 export function getPublicUploadBaseUrl() {
   const configuredBaseUrl = [
     process.env.PUBLIC_UPLOAD_BASE_URL,
@@ -37,4 +46,3 @@ export function getPublicUploadBaseUrl() {
 
   return normalizePath((configuredBaseUrl || "").trim());
 }
-
