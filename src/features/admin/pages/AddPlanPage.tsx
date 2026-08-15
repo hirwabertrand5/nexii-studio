@@ -167,6 +167,23 @@ export default function AddPlan() {
     setPrivateFiles((prev) => prev.map((entry, currentIndex) => (currentIndex === index ? { ...entry, file } : entry)));
   };
 
+  function readFormValues(form: HTMLFormElement) {
+    const values = new FormData(form);
+
+    return {
+      name: String(values.get("name") ?? "").trim(),
+      category: String(values.get("category") ?? "").trim(),
+      style: String(values.get("style") ?? "").trim(),
+      description: String(values.get("description") ?? "").trim(),
+      bedrooms: String(values.get("bedrooms") ?? "").trim(),
+      bathrooms: String(values.get("bathrooms") ?? "").trim(),
+      floors: String(values.get("floors") ?? "").trim(),
+      area: String(values.get("area") ?? "").trim(),
+      plotSize: String(values.get("plotSize") ?? "").trim(),
+      price: String(values.get("price") ?? "").trim()
+    };
+  }
+
   const requiredFieldsFilled =
     formData.name.trim() &&
     formData.category.trim() &&
@@ -181,12 +198,15 @@ export default function AddPlan() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.category.trim() || !formData.description.trim()) {
+    const submittedForm = e.currentTarget as HTMLFormElement;
+    const submittedValues = readFormValues(submittedForm);
+
+    if (!submittedValues.name || !submittedValues.category || !submittedValues.description) {
       toast.error("Title, category, and description are required");
       return;
     }
 
-    if (!formData.bedrooms.trim() || !formData.bathrooms.trim() || !formData.floors.trim() || !formData.area.trim() || !formData.plotSize.trim() || !formData.price.trim()) {
+    if (!submittedValues.bedrooms || !submittedValues.bathrooms || !submittedValues.floors || !submittedValues.area || !submittedValues.plotSize || !submittedValues.price) {
       toast.error("Bedrooms, bathrooms, floors, area, plot size, and price are required");
       return;
     }
@@ -198,7 +218,7 @@ export default function AddPlan() {
 
     setIsSubmitting(true);
     try {
-      await adminPlansApi.createPlan(buildFormData(formData, imageFiles, privateFiles));
+      await adminPlansApi.createPlan(buildFormData(submittedValues, imageFiles, privateFiles));
       toast.success("House plan created successfully");
       setTimeout(() => navigate("/admin/plans"), 1000);
     } catch (err) {
@@ -272,6 +292,7 @@ export default function AddPlan() {
                 <Label htmlFor="name">Plan Name</Label>
                 <Input
                   id="name"
+                  name="name"
                   className={fieldClassName()}
                   value={formData.name}
                   onChange={(e) => handleChange("name", e.target.value)}
@@ -284,6 +305,7 @@ export default function AddPlan() {
                   <Label htmlFor="category">Category</Label>
                   <Input
                     id="category"
+                    name="category"
                     list="category-options"
                     className={fieldClassName()}
                     value={formData.category}
@@ -301,6 +323,7 @@ export default function AddPlan() {
                   <Label htmlFor="style">Architectural Style</Label>
                   <Input
                     id="style"
+                    name="style"
                     className={fieldClassName()}
                     value={formData.style}
                     onChange={(e) => handleChange("style", e.target.value)}
@@ -313,6 +336,7 @@ export default function AddPlan() {
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
+                  name="description"
                   className={fieldClassName()}
                   value={formData.description}
                   onChange={(e) => handleChange("description", e.target.value)}
@@ -335,8 +359,11 @@ export default function AddPlan() {
                 <Label htmlFor="bedrooms">Bedrooms</Label>
                 <Input
                   id="bedrooms"
+                  name="bedrooms"
                   type="number"
                   min="0"
+                  step="1"
+                  inputMode="numeric"
                   className={fieldClassName()}
                   value={formData.bedrooms}
                   onChange={(e) => handleChange("bedrooms", e.target.value)}
@@ -347,8 +374,11 @@ export default function AddPlan() {
                 <Label htmlFor="bathrooms">Bathrooms</Label>
                 <Input
                   id="bathrooms"
+                  name="bathrooms"
                   type="number"
                   min="0"
+                  step="1"
+                  inputMode="numeric"
                   className={fieldClassName()}
                   value={formData.bathrooms}
                   onChange={(e) => handleChange("bathrooms", e.target.value)}
@@ -359,8 +389,11 @@ export default function AddPlan() {
                 <Label htmlFor="floors">Floors</Label>
                 <Input
                   id="floors"
+                  name="floors"
                   type="number"
                   min="0"
+                  step="1"
+                  inputMode="numeric"
                   className={fieldClassName()}
                   value={formData.floors}
                   onChange={(e) => handleChange("floors", e.target.value)}
@@ -371,8 +404,11 @@ export default function AddPlan() {
                 <Label htmlFor="area">Total Area (m2)</Label>
                 <Input
                   id="area"
+                  name="area"
                   type="number"
                   min="0"
+                  step="any"
+                  inputMode="decimal"
                   className={fieldClassName()}
                   value={formData.area}
                   onChange={(e) => handleChange("area", e.target.value)}
@@ -383,8 +419,11 @@ export default function AddPlan() {
                 <Label htmlFor="plotSize">Plot Size (m2)</Label>
                 <Input
                   id="plotSize"
+                  name="plotSize"
                   type="number"
                   min="0"
+                  step="any"
+                  inputMode="decimal"
                   className={fieldClassName()}
                   value={formData.plotSize}
                   onChange={(e) => handleChange("plotSize", e.target.value)}
@@ -396,8 +435,11 @@ export default function AddPlan() {
                 <Label htmlFor="price">Price (USD)</Label>
                 <Input
                   id="price"
+                  name="price"
                   type="number"
                   min="0"
+                  step="any"
+                  inputMode="decimal"
                   className={fieldClassName()}
                   value={formData.price}
                   onChange={(e) => handleChange("price", e.target.value)}

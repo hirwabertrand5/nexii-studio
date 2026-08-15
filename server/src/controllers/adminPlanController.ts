@@ -7,6 +7,7 @@ import { AdminActivityLog } from "../models/AdminActivityLog.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
+import { ensureCloudinaryPlanImageUrls } from "../utils/planImageValidation.js";
 import { getPrivateUploadStorageRoot } from "../utils/uploadStorage.js";
 import { deleteCloudinaryImage, uploadImageBufferToCloudinary } from "../services/cloudinaryImageService.js";
 
@@ -296,11 +297,17 @@ async function buildCreatePayload(
   if (images.length === 0) {
     throw new AppError("At least one image is required", 400);
   }
+  if (uploadedImages.length === 0) {
+    ensureCloudinaryPlanImageUrls(images.map(extractPlanImageUrl), "images");
+  }
 
   const previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages")
     ?? (uploadedImages.length > 0
       ? uploadedImages.map(extractPlanImageUrl).slice(0, 3)
       : images.map(extractPlanImageUrl).slice(0, 3));
+  if (previewImages.length > 0) {
+    ensureCloudinaryPlanImageUrls(previewImages, "previewImages");
+  }
   const filesIncluded = parseStringArrayField(body.filesIncluded, "filesIncluded") ?? [];
   const digitalFiles = await uploadPrivateDigitalFiles(
     digitalUploadFiles,
@@ -371,12 +378,17 @@ async function buildUpdatePayload(
   } else if (body.images !== undefined || body.imageUrls !== undefined || body.imageUrl !== undefined) {
     const parsedImages = parseStringArrayField(body.images ?? body.imageUrls ?? body.imageUrl, "images", { required: true });
     if (parsedImages) {
+      ensureCloudinaryPlanImageUrls(parsedImages.map(extractPlanImageUrl), "images");
       updates.images = parsedImages;
     }
   }
 
   if (body.previewImages !== undefined || body.previewImageUrls !== undefined) {
-    updates.previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages");
+    const parsedPreviewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages");
+    if (parsedPreviewImages) {
+      ensureCloudinaryPlanImageUrls(parsedPreviewImages, "previewImages");
+    }
+    updates.previewImages = parsedPreviewImages;
   }
 
   if (body.filesIncluded !== undefined) {

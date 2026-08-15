@@ -16,6 +16,7 @@ import {
   toPositiveInteger,
   toPositiveNumber
 } from "../utils/validators.js";
+import { ensureCloudinaryPlanImageUrls } from "../utils/planImageValidation.js";
 
 export type CreatePlanInput = Omit<HousePlanAttrs, "createdBy">;
 export type UpdatePlanInput = Partial<CreatePlanInput>;
@@ -115,6 +116,13 @@ function parseDigitalFiles(value: unknown, required = false) {
 
 export function parseCreatePlanInput(body: unknown): CreatePlanInput {
   const input = (body ?? {}) as Record<string, unknown>;
+  const images = stringArray(input.images, "images", true);
+  const previewImages = stringArray(input.previewImages, "previewImages");
+
+  ensureCloudinaryPlanImageUrls(images, "images");
+  if (previewImages.length > 0) {
+    ensureCloudinaryPlanImageUrls(previewImages, "previewImages");
+  }
 
   return {
     title: requiredString(input.title, "title"),
@@ -127,8 +135,8 @@ export function parseCreatePlanInput(body: unknown): CreatePlanInput {
     totalArea: toPositiveNumber(input.totalArea, "totalArea"),
     architecturalStyle: requiredString(input.architecturalStyle, "architecturalStyle").toLowerCase(),
     category: normalizeCategory(input.category),
-    images: stringArray(input.images, "images", true),
-    previewImages: stringArray(input.previewImages, "previewImages"),
+    images,
+    previewImages,
     filesIncluded: stringArray(input.filesIncluded, "filesIncluded"),
     digitalFiles: parseDigitalFiles(input.digitalFiles),
     isFeatured: Boolean(input.isFeatured),
@@ -152,8 +160,18 @@ export function parseUpdatePlanInput(body: unknown): UpdatePlanInput {
     update.architecturalStyle = requiredString(input.architecturalStyle, "architecturalStyle").toLowerCase();
   }
   if ("category" in input) update.category = normalizeCategory(input.category);
-  if ("images" in input) update.images = stringArray(input.images, "images", true);
-  if ("previewImages" in input) update.previewImages = stringArray(input.previewImages, "previewImages");
+  if ("images" in input) {
+    const images = stringArray(input.images, "images", true);
+    ensureCloudinaryPlanImageUrls(images, "images");
+    update.images = images;
+  }
+  if ("previewImages" in input) {
+    const previewImages = stringArray(input.previewImages, "previewImages");
+    if (previewImages.length > 0) {
+      ensureCloudinaryPlanImageUrls(previewImages, "previewImages");
+    }
+    update.previewImages = previewImages;
+  }
   if ("filesIncluded" in input) update.filesIncluded = stringArray(input.filesIncluded, "filesIncluded");
   if ("digitalFiles" in input) update.digitalFiles = parseDigitalFiles(input.digitalFiles, true);
   if ("isFeatured" in input) update.isFeatured = Boolean(input.isFeatured);
