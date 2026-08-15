@@ -111,9 +111,10 @@ curl https://your-domain.com/health
 - Should be rate-limited after 5 attempts in 15 minutes
 
 ### 6. File Upload
-- Test image upload to Cloudinary
+- Test plan image upload to Cloudinary
 - Test document upload to S3
-- Verify files are accessible
+- Verify plan images survive Render redeploys because they no longer depend on the Render filesystem
+- Verify legacy `/uploads` records still resolve during migration
 
 ## Production Monitoring
 

@@ -1,4 +1,5 @@
 import { http } from "@/shared/api/http";
+import type { ImageAssetLike } from "@/shared/utils/image";
 
 export type BuyerPlanRef = {
   _id: string;
@@ -6,8 +7,8 @@ export type BuyerPlanRef = {
   price: number;
   category?: string;
   architecturalStyle?: string;
-  images?: string[];
-  previewImages?: string[];
+  images?: Array<ImageAssetLike>;
+  previewImages?: Array<ImageAssetLike>;
   filesIncluded?: string[];
 };
 

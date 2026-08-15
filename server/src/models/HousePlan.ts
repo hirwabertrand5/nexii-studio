@@ -13,6 +13,16 @@ export const PLAN_STATUSES = ["draft", "published"] as const;
 export type PlanCategory = string;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
+export interface PlanImageAsset {
+  url: string;
+  publicId: string;
+  width?: number;
+  height?: number;
+  format?: string;
+}
+
+export type PlanImage = string | PlanImageAsset;
+
 export interface HousePlanAttrs {
   title: string;
   description: string;
@@ -24,7 +34,7 @@ export interface HousePlanAttrs {
   totalArea: number;
   architecturalStyle: string;
   category: PlanCategory;
-  images: string[];
+  images: PlanImage[];
   previewImages: string[];
   filesIncluded: string[];
   digitalFiles: {
@@ -53,7 +63,7 @@ const housePlanSchema = new Schema<HousePlanAttrs>(
     totalArea: { type: Number, required: true, min: 0 },
     architecturalStyle: { type: String, required: true, trim: true, lowercase: true, index: true },
     category: { type: String, required: true, trim: true, index: true },
-    images: [{ type: String, required: true, trim: true }],
+    images: [{ type: Schema.Types.Mixed, required: true }],
     previewImages: [{ type: String, trim: true }],
     filesIncluded: [{ type: String, trim: true }],
     digitalFiles: [

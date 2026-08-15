@@ -1,56 +1,93 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type ImgHTMLAttributes, type ReactEventHandler } from "react";
+import { buildResponsiveSrcSet, isCloudinaryDeliveryUrl } from "@/shared/utils/image";
 
 const ERROR_IMG_SRC =
-  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg=='
+  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHN0cm9rZT0iI2RkZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4=";
 
-export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElement>) {
-  const [didError, setDidError] = useState(false)
+export type NexiiImageProps = ImgHTMLAttributes<HTMLImageElement> & {
+  responsiveWidths?: number[];
+  priority?: boolean;
+  fallbackSrc?: string;
+};
+
+export function NexiiImage({
+  src,
+  alt,
+  style,
+  className,
+  loading,
+  decoding,
+  sizes,
+  fetchPriority,
+  responsiveWidths = [320, 480, 640, 800, 1200, 1600],
+  priority = false,
+  fallbackSrc,
+  onError,
+  srcSet,
+  ...rest
+}: NexiiImageProps) {
+  const [didError, setDidError] = useState(false);
 
   useEffect(() => {
-    setDidError(false)
-  }, [props.src])
+    setDidError(false);
+  }, [src]);
 
-  const handleError = () => {
-    setDidError(true)
-  }
+  const resolvedLoading = loading ?? (priority ? "eager" : "lazy");
+  const resolvedDecoding = decoding ?? "async";
+  const resolvedFetchPriority = fetchPriority ?? (priority ? "high" : undefined);
+  const resolvedSizes = sizes ?? "(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw";
+  const resolvedSrc = typeof src === "string" ? src : "";
 
-  const { src, alt, style, className, loading, decoding, sizes, fetchPriority, ...rest } = props
-  const resolvedLoading = loading ?? 'lazy'
-  const resolvedDecoding = decoding ?? 'async'
-  const resolvedSizes = sizes ?? '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
-  // default classes to ensure images always fill the reserved tile and behave consistently
-  const baseImgClasses = 'block h-full w-full object-cover object-center transition-transform duration-300 ease-out transform-gpu'
-  const finalClassName = [className, baseImgClasses].filter(Boolean).join(' ')
+  const computedSrcSet = useMemo(() => {
+    if (srcSet) return srcSet;
+    if (!resolvedSrc || !isCloudinaryDeliveryUrl(resolvedSrc)) return undefined;
+    return buildResponsiveSrcSet(resolvedSrc, responsiveWidths);
+  }, [responsiveWidths, resolvedSrc, srcSet]);
 
-  return didError ? (
-    <div
-      className={`inline-block h-full w-full overflow-hidden bg-gray-100 text-center align-middle ${className ?? ''}`}
-      style={style}
-    >
-      <div className="flex h-full w-full items-center justify-center">
+  const handleError: ReactEventHandler<HTMLImageElement> = (event) => {
+    setDidError(true);
+    onError?.(event);
+  };
+
+  const baseImgClasses = "block h-full w-full object-cover object-center";
+  const finalClassName = [className, baseImgClasses].filter(Boolean).join(" ");
+
+  if (didError) {
+    return (
+      <div
+        className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-muted ${className ?? ""}`}
+        style={style}
+        aria-label={alt}
+      >
         <img
-          src={ERROR_IMG_SRC}
-          alt="Error loading image"
-          className={baseImgClasses}
-          loading={resolvedLoading}
-          decoding={resolvedDecoding}
-          sizes={resolvedSizes}
-          {...rest}
-          data-original-url={src}
+          src={fallbackSrc ?? ERROR_IMG_SRC}
+          alt={alt}
+          className="h-full w-full object-contain p-4 opacity-80"
+          loading="lazy"
+          decoding="async"
+          aria-hidden="true"
         />
       </div>
-    </div>
-  ) : (
+    );
+  }
+
+  return (
     <img
-      src={src}
+      src={resolvedSrc}
       alt={alt}
       className={finalClassName}
       style={style}
       loading={resolvedLoading}
       decoding={resolvedDecoding}
+      fetchPriority={resolvedFetchPriority}
       sizes={resolvedSizes}
-      {...rest}
+      srcSet={computedSrcSet}
       onError={handleError}
+      {...rest}
     />
-  )
+  );
+}
+
+export function ImageWithFallback(props: NexiiImageProps) {
+  return <NexiiImage {...props} />;
 }

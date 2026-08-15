@@ -1,4 +1,5 @@
 import { http } from "@/shared/api/http";
+import { extractImageUrl, type ImageAssetLike, buildResponsiveSrcSet } from "@/shared/utils/image";
 
 function withQuery(path: string, params?: Record<string, unknown>) {
   if (!params) return path;
@@ -67,8 +68,8 @@ export interface PublicPlanSummary {
   totalArea: number;
   architecturalStyle: string;
   category: string;
-  images: string[];
-  previewImages?: string[];
+  images: Array<ImageAssetLike>;
+  previewImages?: Array<ImageAssetLike>;
   filesIncluded?: string[];
   status?: string;
   isFeatured: boolean;
@@ -105,9 +106,10 @@ export function formatPlanCategoryLabel(category?: string) {
     .join(" ");
 }
 
-export function resolvePlanImageUrl(src?: string | null) {
-  if (!src) return fallbackImage;
-  const value = String(src).trim();
+export function resolvePlanImageUrl(src?: ImageAssetLike | null) {
+  const extracted = extractImageUrl(src);
+  if (!extracted) return fallbackImage;
+  const value = String(extracted).trim();
   if (!value) return fallbackImage;
 
   if (/^https?:\/\//i.test(value)) {
@@ -139,6 +141,11 @@ export function resolvePlanImageUrl(src?: string | null) {
   if (value.startsWith("/")) return value;
   if (/^(data:|blob:)/i.test(value)) return value;
   return fallbackImage;
+}
+
+export function getPlanImageSrcSet(src?: ImageAssetLike | null, widths: number[] = [320, 480, 640, 800, 1200, 1600]) {
+  const resolved = resolvePlanImageUrl(src as ImageAssetLike);
+  return buildResponsiveSrcSet(resolved, widths);
 }
 
 export function collectPlanCategories(plans: PublicPlanSummary[]): PublicPlanCategoryOption[] {

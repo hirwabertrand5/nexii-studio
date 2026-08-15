@@ -52,3 +52,7 @@ For more Stripe test numbers see: https://stripe.com/docs/testing#cards
 
 If you want, I can also run the dev servers here to verify CORS and test the payment flows locally.
 
+Cloudinary note:
+- Public house-plan images should be stored on Cloudinary and referenced by URL in MongoDB.
+- `CLOUDINARY_API_SECRET` stays backend-only and should never be added to Vercel.
+

@@ -109,6 +109,7 @@ export default function PlanDetails() {
                   <ImageWithFallback
                     src={resolvePlanImageUrl(activeImage)}
                     alt={plan.title}
+                    priority
                     className="w-full h-full object-contain bg-muted/50 p-4"
                   />
                 </div>

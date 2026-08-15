@@ -1,14 +1,14 @@
 import { type Request, type Response } from "express";
-import { type Types } from "mongoose";
+import { Types } from "mongoose";
 import fs from "fs/promises";
 import path from "path";
-import { HousePlan, PLAN_STATUSES, type PlanStatus } from "../models/HousePlan.js";
+import { HousePlan, PLAN_STATUSES, type PlanImage, type PlanImageAsset, type PlanStatus } from "../models/HousePlan.js";
 import { AdminActivityLog } from "../models/AdminActivityLog.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
-import { uploadBufferFile } from "../services/fileUploadService.js";
-import { getPrivateUploadStorageRoot, getRequestPublicBaseUrl } from "../utils/uploadStorage.js";
+import { getPrivateUploadStorageRoot } from "../utils/uploadStorage.js";
+import { deleteCloudinaryImage, uploadImageBufferToCloudinary } from "../services/cloudinaryImageService.js";
 
 type UploadFile = {
   buffer: Buffer;
@@ -26,6 +26,7 @@ type UploadedDigitalFile = {
 };
 
 const privateUploadRoot = getPrivateUploadStorageRoot();
+const VALID_PLAN_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const PRIVATE_FILE_LABELS = [
   "Architectural Plans",
   "Digital Drawings",
@@ -83,7 +84,20 @@ function parseStringArrayField(value: unknown, field: string, { required = false
   const rawValues = Array.isArray(value)
     ? value
     : typeof value === "string"
-    ? value.split(",")
+    ? (() => {
+        const trimmed = value.trim();
+        if (trimmed.startsWith("[")) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              return parsed;
+            }
+          } catch {
+            // fall through to comma-separated parsing
+          }
+        }
+        return value.split(",");
+      })()
     : null;
 
   if (!rawValues) {
@@ -139,6 +153,25 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }
 
+function isPlanImageAsset(value: PlanImage): value is PlanImageAsset {
+  return Boolean(value && typeof value === "object" && "url" in value && "publicId" in value);
+}
+
+function extractPlanImageUrl(value: PlanImage) {
+  if (typeof value === "string") return value;
+  return value.url;
+}
+
+function extractPlanImagePublicId(value: PlanImage) {
+  if (typeof value === "string") return undefined;
+  return value.publicId;
+}
+
+async function deleteOldPlanImages(images: PlanImage[]) {
+  const publicIds = images.map(extractPlanImagePublicId).filter((value): value is string => Boolean(value));
+  await Promise.allSettled(publicIds.map((publicId) => deleteCloudinaryImage(publicId)));
+}
+
 function getUploadedFieldFiles(req: Request, fieldName: string) {
   const rawFiles = (req as any).files;
   if (!rawFiles) return [] as UploadFile[];
@@ -182,37 +215,35 @@ function parseDigitalFileLabels(value: unknown) {
     .filter(Boolean);
 }
 
-async function uploadPlanImages(files: UploadFile[], publicBaseUrl?: string) {
-  if (!files.length) return [] as string[];
+async function uploadPlanImages(files: UploadFile[], folder: string): Promise<PlanImage[]> {
+  if (!files.length) return [] as PlanImage[];
   if (files.length > 5) {
     throw new AppError("You can upload a maximum of 5 images", 400);
   }
 
   const validations = files.map((file) => {
-    if (!file.mimetype?.startsWith("image/")) {
-      throw new AppError("Plan images must be image files", 400);
+    if (!VALID_PLAN_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      throw new AppError("Plan images must be JPEG, PNG, or WebP files", 400);
     }
     return file;
   });
 
   const uploads = await Promise.all(
-    validations.map(async (file) => {
-      const uploaded = await uploadBufferFile(
-        file.buffer,
-        file.originalname,
-        file.mimetype,
-        file.size,
-        "inspiration",
-        { publicBaseUrl }
-      );
-      if (!uploaded.url) {
-        throw new AppError("Image upload failed to produce a public URL", 500);
-      }
-      return uploaded.url;
-    })
+    validations.map(async (file, index) =>
+      uploadImageBufferToCloudinary(file.buffer, {
+        folder: String(folder ?? "").trim(),
+        publicId: index === 0 ? "main" : `gallery-${index}`
+      })
+    )
   );
 
-  return uploads;
+  return uploads.map((uploaded, index) => ({
+    url: uploaded.url,
+    publicId: uploaded.publicId,
+    width: uploaded.width,
+    height: uploaded.height,
+    format: uploaded.format
+  }));
 }
 
 async function uploadPrivateDigitalFiles(files: UploadFile[], labels: string[]): Promise<UploadedDigitalFile[]> {
@@ -245,9 +276,9 @@ async function uploadPrivateDigitalFiles(files: UploadFile[], labels: string[]):
 async function buildCreatePayload(
   body: Record<string, unknown>,
   adminId: Types.ObjectId,
+  planId: Types.ObjectId,
   imageFiles: UploadFile[],
-  digitalUploadFiles: UploadFile[],
-  publicBaseUrl?: string
+  digitalUploadFiles: UploadFile[]
 ) {
   const title = pickString(body.title, body.name);
   const description = pickString(body.description);
@@ -257,7 +288,7 @@ async function buildCreatePayload(
   if (!description) throw new AppError("description is required", 400);
   if (!architecturalStyle) throw new AppError("architecturalStyle is required", 400);
 
-  const uploadedImages = await uploadPlanImages(imageFiles, publicBaseUrl);
+  const uploadedImages = await uploadPlanImages(imageFiles, `nexii/house-plans/${planId.toString()}`);
   const images = uploadedImages.length > 0
     ? uploadedImages
     : parseStringArrayField(body.images ?? body.imageUrls ?? body.imageUrl, "images", { required: true }) ?? [];
@@ -266,7 +297,10 @@ async function buildCreatePayload(
     throw new AppError("At least one image is required", 400);
   }
 
-  const previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages") ?? images.slice(0, 3);
+  const previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages")
+    ?? (uploadedImages.length > 0
+      ? uploadedImages.map(extractPlanImageUrl).slice(0, 3)
+      : images.map(extractPlanImageUrl).slice(0, 3));
   const filesIncluded = parseStringArrayField(body.filesIncluded, "filesIncluded") ?? [];
   const digitalFiles = await uploadPrivateDigitalFiles(
     digitalUploadFiles,
@@ -279,6 +313,7 @@ async function buildCreatePayload(
       : ("published" as PlanStatus);
 
   return {
+    _id: planId,
     title,
     description,
     price: parseNumberField(body.price, "price") as number,
@@ -301,9 +336,9 @@ async function buildCreatePayload(
 
 async function buildUpdatePayload(
   body: Record<string, unknown>,
+  planId: string,
   imageFiles: UploadFile[],
-  digitalUploadFiles: UploadFile[],
-  publicBaseUrl?: string
+  digitalUploadFiles: UploadFile[]
 ) {
   const updates: Record<string, unknown> = {};
 
@@ -329,10 +364,10 @@ async function buildUpdatePayload(
     updates.category = parseCategoryField(body.category);
   }
 
-  const uploadedImages = await uploadPlanImages(imageFiles, publicBaseUrl);
+  const uploadedImages = await uploadPlanImages(imageFiles, `nexii/house-plans/${planId}`);
   if (uploadedImages.length > 0) {
     updates.images = uploadedImages;
-    updates.previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages") ?? uploadedImages.slice(0, 3);
+    updates.previewImages = parseStringArrayField(body.previewImages ?? body.previewImageUrls, "previewImages") ?? uploadedImages.map(extractPlanImageUrl).slice(0, 3);
   } else if (body.images !== undefined || body.imageUrls !== undefined || body.imageUrl !== undefined) {
     const parsedImages = parseStringArrayField(body.images ?? body.imageUrls ?? body.imageUrl, "images", { required: true });
     if (parsedImages) {
@@ -374,24 +409,33 @@ export const createPlan = asyncHandler(async (req: Request, res: Response) => {
     throw new AppError("Unauthorized", 401);
   }
 
+  const planId = new Types.ObjectId();
   const payload = await buildCreatePayload(
     (req.body ?? {}) as Record<string, unknown>,
     adminId,
+    planId,
     getUploadedFieldFiles(req, "images"),
-    getUploadedFieldFiles(req, "digitalFiles"),
-    getRequestPublicBaseUrl(req)
+    getUploadedFieldFiles(req, "digitalFiles")
   );
-  const plan = await HousePlan.create(payload);
 
-  await AdminActivityLog.create({
-    admin: adminId,
-    action: "plan-created",
-    targetModel: "HousePlan",
-    targetId: plan._id,
-    description: `Created plan: ${plan.title}`
-  });
+  try {
+    const plan = await HousePlan.create(payload as any);
 
-  res.status(201).json(apiResponse(true, "Plan created successfully", plan));
+    await AdminActivityLog.create({
+      admin: adminId,
+      action: "plan-created",
+      targetModel: "HousePlan",
+      targetId: plan._id,
+      description: `Created plan: ${plan.title}`
+    });
+
+    res.status(201).json(apiResponse(true, "Plan created successfully", plan));
+  } catch (error) {
+    if (Array.isArray(payload.images)) {
+      await deleteOldPlanImages(payload.images as PlanImage[]).catch(() => undefined);
+    }
+    throw error;
+  }
 });
 
 // Get all plans with filters
@@ -442,21 +486,34 @@ export const getPlanById = asyncHandler(async (req: Request, res: Response) => {
 // Update plan
 export const updatePlan = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  const planId = Array.isArray(id) ? id[0] : id;
+  if (!planId) throw new AppError("Plan not found", 404);
 
-  const plan = await HousePlan.findById(id);
+  const plan = await HousePlan.findById(planId);
   if (!plan) throw new AppError("Plan not found", 404);
 
   const oldPlan = plan.toObject();
   const previousPlan = oldPlan as unknown as Record<string, unknown>;
   const updates = await buildUpdatePayload(
     (req.body ?? {}) as Record<string, unknown>,
+    planId,
     getUploadedFieldFiles(req, "images"),
-    getUploadedFieldFiles(req, "digitalFiles"),
-    getRequestPublicBaseUrl(req)
+    getUploadedFieldFiles(req, "digitalFiles")
   );
 
-  Object.assign(plan, updates);
-  await plan.save();
+  try {
+    Object.assign(plan, updates);
+    await plan.save();
+  } catch (error) {
+    if (Array.isArray(updates.images) && updates.images.some(isPlanImageAsset)) {
+      await deleteOldPlanImages(updates.images as PlanImage[]).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  if (Array.isArray(previousPlan.images) && previousPlan.images.length > 0 && Array.isArray(updates.images) && updates.images.length > 0) {
+    await deleteOldPlanImages(previousPlan.images as PlanImage[]);
+  }
 
   const trackedFields = ["title", "price", "status", "isFeatured", "category", "images"] as const;
   const nextPlan = plan.toObject() as unknown as Record<string, unknown>;
@@ -528,8 +585,11 @@ export const publishPlan = asyncHandler(async (req: Request, res: Response) => {
 export const deletePlan = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const plan = await HousePlan.findByIdAndDelete(id);
+  const plan = await HousePlan.findById(id);
   if (!plan) throw new AppError("Plan not found", 404);
+
+  await deleteOldPlanImages((plan as any).images as PlanImage[]).catch(() => undefined);
+  await HousePlan.findByIdAndDelete(id);
 
   await AdminActivityLog.create({
     admin: (req as any).admin._id,
@@ -550,6 +610,8 @@ export const bulkDeletePlans = asyncHandler(async (req: Request, res: Response) 
     throw new AppError("Please provide an array of plan IDs", 400);
   }
 
+  const plans = await HousePlan.find({ _id: { $in: ids } }).select("images");
+  await Promise.all(plans.map((plan) => deleteOldPlanImages(((plan as any).images ?? []) as PlanImage[]).catch(() => undefined)));
   const result = await HousePlan.deleteMany({ _id: { $in: ids } });
 
   await AdminActivityLog.create({

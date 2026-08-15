@@ -1,4 +1,5 @@
 import { http } from "@/shared/api/http";
+import type { ImageAssetLike } from "@/shared/utils/image";
 
 function withQuery(path: string, params?: Record<string, unknown>) {
   if (!params) return path;
@@ -78,8 +79,8 @@ export interface AdminPlanSummary {
   totalArea: number;
   architecturalStyle: string;
   price: number;
-  images: string[];
-  previewImages?: string[];
+  images: Array<ImageAssetLike>;
+  previewImages?: Array<ImageAssetLike>;
   filesIncluded?: string[];
   digitalFiles?: Array<{
     label: string;

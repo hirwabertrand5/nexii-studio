@@ -4,7 +4,7 @@ Use these values for a split deployment:
 
 - Frontend on Vercel
 - Backend on Render
-- Persistent uploads stored on Render disk
+- Public plan images delivered from Cloudinary CDN
 
 ## Vercel Frontend
 
@@ -39,24 +39,22 @@ GOOGLE_CLIENT_ID=540314344768-8v68ijf4hf39tue2vqj2kk4dddsboam6.apps.googleuserco
 AUTH_COOKIE_SAME_SITE=none
 AUTH_COOKIE_SECURE=true
 
-# Uploads
-UPLOADS_DIR=/var/data/uploads
+# Cloudinary public plan images
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Private buyer-only documents can remain on secure object storage
 PRIVATE_UPLOADS_DIR=/var/data/private-uploads
-PUBLIC_UPLOAD_BASE_URL=https://nexii-studio-api.onrender.com
 
 # Admin
 ADMIN_EMAIL=admin@nexii-studio.com
 ```
 
-## Render Disk
+## Render Notes
 
-Attach a persistent disk to the Render backend and mount it at:
-
-```env
-/var/data
-```
-
-That makes uploaded plan images survive restarts and redeploys.
+Public house-plan images should not depend on Render filesystem storage anymore.
+Render should only store backend state and any private document assets.
 
 ## Google Cloud Console
 

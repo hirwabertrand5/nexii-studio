@@ -19,6 +19,7 @@ import { adminPlanRoutes } from "./routes/adminPlanRoutes.js";
 import { adminPaymentRoutes } from "./routes/adminPaymentRoutes.js";
 import { adminUserRoutes } from "./routes/adminUserRoutes.js";
 import { adminCustomRequestRoutes } from "./routes/adminCustomRequestRoutes.js";
+import { uploadRoutes } from "./routes/uploadRoutes.js";
 import { requestRoutes } from "./routes/requestRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorMiddleware.js";
 import { apiLimiter } from "./middleware/rateLimitMiddleware.js";
@@ -111,6 +112,7 @@ export function createApp() {
   app.use("/api/admin/payments", adminPaymentRoutes);
   app.use("/api/admin/users", adminUserRoutes);
   app.use("/api/admin/requests", adminCustomRequestRoutes);
+  app.use("/api/uploads", uploadRoutes);
   app.use("/api/requests", requestRoutes);
 
   app.use(notFoundHandler);
