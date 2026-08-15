@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Link, useNavigate } from "react-router";
-import { ArrowLeft, FileText, Plus, Sparkles, Trash2, Upload, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Trash2, Upload, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -54,7 +54,11 @@ function buildFormData(formData: Record<string, string>, imageFiles: File[], pri
   if (selectedPrivateFiles.length > 0) {
     payload.append(
       "digitalFilesLabels",
-      JSON.stringify(selectedPrivateFiles.map((entry, index) => entry.label.trim() || PRIVATE_FILE_SLOTS[index] || `Private File ${index + 1}`))
+      JSON.stringify(
+        selectedPrivateFiles.map(
+          (entry, index) => entry.label.trim() || PRIVATE_FILE_SLOTS[index] || `Private File ${index + 1}`
+        )
+      )
     );
     selectedPrivateFiles.forEach((entry) => {
       if (entry.file) payload.append("digitalFiles", entry.file);
@@ -205,7 +209,7 @@ export default function AddPlan() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link to="/admin/plans">
           <Button variant="ghost" size="sm">
@@ -214,391 +218,366 @@ export default function AddPlan() {
           </Button>
         </Link>
 
-        <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary">
-          <Sparkles className="h-4 w-4" />
-          Fast create mode
+        <div className="rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+          Cloudinary-backed uploads
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
-        <div className="space-y-6">
-          <Card className="border-slate-200/80 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight">Add New House Plan</h1>
-                <p className="text-sm text-muted-foreground">
-                  Fill the essentials once, upload the gallery in seconds, and publish directly to visitors.
+      <Card className="overflow-hidden border-slate-200/80 shadow-sm">
+        <CardContent className="p-6 sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <div className="inline-flex w-fit items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Add plan
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Add New House Plan</h1>
+              <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+                Enter the plan details once, add the gallery, and publish when you&apos;re ready. The layout stays focused so you can move quickly without feeling rushed.
+              </p>
+            </div>
+
+            <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-xl">
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Core fields</p>
+                <p className="mt-2 text-2xl font-semibold">{requiredFieldsFilled ? "Ready" : "Incomplete"}</p>
+              </div>
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Images</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {imageFiles.length}/{MAX_IMAGES}
                 </p>
               </div>
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Private files</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border bg-muted/20 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Core fields</p>
-                  <p className="mt-2 text-xl font-semibold">{requiredFieldsFilled ? "Ready" : "In progress"}</p>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle>Basic Information</CardTitle>
+            <CardDescription>
+              Use a short title, a clear category, and a description that answers the first customer questions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Plan Name</Label>
+                <Input
+                  id="name"
+                  className={fieldClassName()}
+                  value={formData.name}
+                  onChange={(e) => handleChange("name", e.target.value)}
+                  placeholder="e.g., Modern African Villa"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    list="category-options"
+                    className={fieldClassName()}
+                    value={formData.category}
+                    onChange={(e) => handleChange("category", e.target.value)}
+                    placeholder="e.g., bungalow, town house, luxury villa"
+                  />
+                  <datalist id="category-options">
+                    {PLAN_CATEGORY_OPTIONS.map((cat) => (
+                      <option key={cat.value} value={cat.label} />
+                    ))}
+                  </datalist>
                 </div>
-                <div className="rounded-xl border bg-muted/20 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Images</p>
-                  <p className="mt-2 text-xl font-semibold">
-                    {imageFiles.length}/{MAX_IMAGES}
-                  </p>
-                </div>
-                <div className="rounded-xl border bg-muted/20 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Private files</p>
-                  <p className="mt-2 text-xl font-semibold">
-                    {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length}
-                  </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="style">Architectural Style</Label>
+                  <Input
+                    id="style"
+                    className={fieldClassName()}
+                    value={formData.style}
+                    onChange={(e) => handleChange("style", e.target.value)}
+                    placeholder="e.g., African Contemporary"
+                  />
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Plan Name</Label>
-                    <Input
-                      id="name"
-                      className={fieldClassName()}
-                      value={formData.name}
-                      onChange={(e) => handleChange("name", e.target.value)}
-                      placeholder="e.g., Modern African Villa"
-                    />
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  className={fieldClassName()}
+                  value={formData.description}
+                  onChange={(e) => handleChange("description", e.target.value)}
+                  placeholder="Describe the house plan..."
+                  rows={5}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle>Specifications</CardTitle>
+            <CardDescription>Keep the measurements accurate. These are the fields buyers compare first.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="bedrooms">Bedrooms</Label>
+                <Input
+                  id="bedrooms"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.bedrooms}
+                  onChange={(e) => handleChange("bedrooms", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bathrooms">Bathrooms</Label>
+                <Input
+                  id="bathrooms"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.bathrooms}
+                  onChange={(e) => handleChange("bathrooms", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="floors">Floors</Label>
+                <Input
+                  id="floors"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.floors}
+                  onChange={(e) => handleChange("floors", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="area">Total Area (m2)</Label>
+                <Input
+                  id="area"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.area}
+                  onChange={(e) => handleChange("area", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plotSize">Plot Size (m2)</Label>
+                <Input
+                  id="plotSize"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.plotSize}
+                  onChange={(e) => handleChange("plotSize", e.target.value)}
+                  placeholder="e.g., 450"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (USD)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  className={fieldClassName()}
+                  value={formData.price}
+                  onChange={(e) => handleChange("price", e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Plan Images</CardTitle>
+                <CardDescription>Upload the main hero image first, then add supporting views if needed.</CardDescription>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {imageFiles.length}/{MAX_IMAGES} selected
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDraggingImages(true);
+              }}
+              onDragLeave={() => setIsDraggingImages(false)}
+              onDrop={handleImageDrop}
+              className={`rounded-2xl border border-dashed p-5 transition-colors ${
+                isDraggingImages ? "border-primary bg-primary/5" : "border-border bg-muted/20"
+              }`}
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-2">
+                    <Upload className="h-4 w-4 text-primary" />
+                    <p className="font-medium">Drop plan images here or choose files</p>
                   </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Input
-                        id="category"
-                        list="category-options"
-                        className={fieldClassName()}
-                        value={formData.category}
-                        onChange={(e) => handleChange("category", e.target.value)}
-                        placeholder="e.g., bungalow, town house, luxury villa"
-                      />
-                      <datalist id="category-options">
-                        {PLAN_CATEGORY_OPTIONS.map((cat) => (
-                          <option key={cat.value} value={cat.label} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="style">Architectural Style</Label>
-                      <Input
-                        id="style"
-                        className={fieldClassName()}
-                        value={formData.style}
-                        onChange={(e) => handleChange("style", e.target.value)}
-                        placeholder="e.g., African Contemporary"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      className={fieldClassName()}
-                      value={formData.description}
-                      onChange={(e) => handleChange("description", e.target.value)}
-                      placeholder="Describe the house plan..."
-                      rows={5}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Specifications</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="bedrooms">Bedrooms</Label>
-                    <Input
-                      id="bedrooms"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.bedrooms}
-                      onChange={(e) => handleChange("bedrooms", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bathrooms">Bathrooms</Label>
-                    <Input
-                      id="bathrooms"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.bathrooms}
-                      onChange={(e) => handleChange("bathrooms", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="floors">Floors</Label>
-                    <Input
-                      id="floors"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.floors}
-                      onChange={(e) => handleChange("floors", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="area">Total Area (m²)</Label>
-                    <Input
-                      id="area"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.area}
-                      onChange={(e) => handleChange("area", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="plotSize">Plot Size (m²)</Label>
-                    <Input
-                      id="plotSize"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.plotSize}
-                      onChange={(e) => handleChange("plotSize", e.target.value)}
-                      placeholder="e.g., 450"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price (USD)</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      min="0"
-                      className={fieldClassName()}
-                      value={formData.price}
-                      onChange={(e) => handleChange("price", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle>Plan Images</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {imageFiles.length}/{MAX_IMAGES} selected
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Add up to {MAX_IMAGES} JPEG, PNG, or WebP images. The first image becomes the main preview.
                   </p>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDraggingImages(true);
-                  }}
-                  onDragLeave={() => setIsDraggingImages(false)}
-                  onDrop={handleImageDrop}
-                  className={`rounded-2xl border border-dashed p-5 transition-colors ${
-                    isDraggingImages ? "border-primary bg-primary/5" : "border-border bg-muted/20"
-                  }`}
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="max-w-2xl">
-                      <div className="flex items-center gap-2">
-                        <Upload className="h-4 w-4 text-primary" />
-                        <p className="font-medium">Drop plan images here or choose files</p>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Upload up to {MAX_IMAGES} images. They are shown instantly in the preview and stored on your backend for production.
-                      </p>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        ref={fileInputRef}
-                        id="images"
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => addImages(e.target.files)}
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    id="images"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => addImages(e.target.files)}
+                  />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Images
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {previewUrls.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {previewUrls.map((url, index) => (
+                  <div key={`${url}-${index}`} className="overflow-hidden rounded-xl border bg-background">
+                    <div className="relative aspect-[4/3]">
+                      <ImageWithFallback
+                        src={url}
+                        alt={`Selected image ${index + 1}`}
+                        className="h-full w-full object-cover"
                       />
-                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Images
+                    </div>
+                    <div className="flex items-start justify-between gap-3 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{imageFiles[index]?.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {((imageFiles[index]?.size ?? 0) / (1024 * 1024)).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeImage(index)}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border bg-background p-6 text-sm text-muted-foreground">
+                No images selected yet. Choose at least one public image so visitors can preview the plan.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                {previewUrls.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {previewUrls.map((url, index) => (
-                      <div key={`${url}-${index}`} className="overflow-hidden rounded-xl border bg-background">
-                        <div className="relative aspect-[4/3]">
-                          <ImageWithFallback
-                            src={url}
-                            alt={`Selected image ${index + 1}`}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div className="flex items-start justify-between gap-3 p-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{imageFiles[index]?.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {((imageFiles[index]?.size ?? 0) / (1024 * 1024)).toFixed(2)} MB
-                              </p>
-                          </div>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeImage(index)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border bg-background p-6 text-sm text-muted-foreground">
-                    No images selected yet. Choose at least one public image so visitors can preview the plan.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <CardTitle>Private Deliverables</CardTitle>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Optional buyer-only files that stay hidden from visitors until purchase.
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length} selected
-                  </p>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <details className="group rounded-xl border bg-muted/10 p-4">
-                  <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
-                    <FileText className="h-4 w-4 text-primary" />
-                    Advanced file uploads
-                  </summary>
-
-                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                    {privateFiles.map((entry, index) => (
-                      <div key={entry.label} className="space-y-3 rounded-xl border bg-background p-4">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <ImageIcon className="h-4 w-4 text-primary" />
-                          <span>File {index + 1}</span>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`private-file-label-${index}`}>Label</Label>
-                          <Input
-                            id={`private-file-label-${index}`}
-                            value={entry.label}
-                            className={fieldClassName()}
-                            onChange={(e) => updatePrivateFileLabel(index, e.target.value)}
-                            placeholder={PRIVATE_FILE_SLOTS[index]}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`private-file-${index}`}>Upload file</Label>
-                          <Input
-                            id={`private-file-${index}`}
-                            type="file"
-                            accept={PRIVATE_FILE_ACCEPT}
-                            className={fieldClassName()}
-                            onChange={(e) => {
-                              updatePrivateFile(index, e.target.files?.[0] ?? null);
-                              e.currentTarget.value = "";
-                            }}
-                          />
-                        </div>
-
-                        {entry.file ? (
-                          <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/20 p-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{entry.file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {(entry.file.size / (1024 * 1024)).toFixed(2)} MB
-                              </p>
-                            </div>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => updatePrivateFile(index, null)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No file selected for this slot yet.</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button type="submit" size="lg" disabled={isSubmitting}>
-                {isSubmitting ? "Publishing..." : "Publish Plan"}
-              </Button>
-              <Link to="/admin/plans">
-                <Button type="button" variant="outline" size="lg">
-                  Cancel
-                </Button>
-              </Link>
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Private Deliverables</CardTitle>
+                <CardDescription>Optional buyer-only files stay hidden from the public catalog until purchase.</CardDescription>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {privateFiles.filter((entry) => entry.file).length}/{PRIVATE_FILE_SLOTS.length} selected
+              </p>
             </div>
-          </form>
-        </div>
+          </CardHeader>
+          <CardContent>
+            <details className="group rounded-xl border bg-muted/10 p-4">
+              <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+                <FileText className="h-4 w-4 text-primary" />
+                Optional file uploads
+              </summary>
 
-        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-          <Card className="border-slate-200/80 shadow-sm">
-            <CardHeader>
-              <CardTitle>Quick Rules</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li>• Title, category, and description are required</li>
-                <li>• Bedrooms, bathrooms, floors, area, plot size, and price must be numbers</li>
-                <li>• At least one public image is required</li>
-                <li>• Private deliverables are optional and stay hidden from the visitor pages</li>
-              </ul>
-            </CardContent>
-          </Card>
+              <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                {privateFiles.map((entry, index) => (
+                  <div key={entry.label} className="space-y-3 rounded-xl border bg-background p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                      <span>File {index + 1}</span>
+                    </div>
 
-          <Card className="border-slate-200/80 shadow-sm">
-            <CardHeader>
-              <CardTitle>Production Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li>• Images are uploaded in parallel for faster submission</li>
-                <li>• Public images are stored on the backend and served from your Render host</li>
-                <li>• For production, set your backend upload base URL to the Render domain</li>
-                <li>• Vercel should point to the Render API through `VITE_API_URL`</li>
-              </ul>
-            </CardContent>
-          </Card>
+                    <div className="space-y-2">
+                      <Label htmlFor={`private-file-label-${index}`}>Label</Label>
+                      <Input
+                        id={`private-file-label-${index}`}
+                        value={entry.label}
+                        className={fieldClassName()}
+                        onChange={(e) => updatePrivateFileLabel(index, e.target.value)}
+                        placeholder={PRIVATE_FILE_SLOTS[index]}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`private-file-${index}`}>Upload file</Label>
+                      <Input
+                        id={`private-file-${index}`}
+                        type="file"
+                        accept={PRIVATE_FILE_ACCEPT}
+                        className={fieldClassName()}
+                        onChange={(e) => {
+                          updatePrivateFile(index, e.target.files?.[0] ?? null);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </div>
+
+                    {entry.file ? (
+                      <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/20 p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{entry.file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(entry.file.size / (1024 * 1024)).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => updatePrivateFile(index, null)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No file selected for this slot yet.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button type="submit" size="lg" disabled={isSubmitting}>
+            {isSubmitting ? "Publishing..." : "Publish Plan"}
+          </Button>
+          <Link to="/admin/plans">
+            <Button type="button" variant="outline" size="lg">
+              Cancel
+            </Button>
+          </Link>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
