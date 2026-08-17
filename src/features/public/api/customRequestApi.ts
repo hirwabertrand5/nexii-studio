@@ -1,6 +1,8 @@
 import { http } from "@/shared/api/http";
 
 export type CreateCustomRequestInput = {
+  contactName: string;
+  contactEmail: string;
   projectTitle: string;
   projectType: string;
   plotSize: number;

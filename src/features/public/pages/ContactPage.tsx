@@ -163,12 +163,8 @@ export default function ContactPage() {
                 <div>
                   <p className="text-sm uppercase tracking-[0.22em] text-primary">Send a message</p>
                   <h2 className="mt-1 text-2xl font-semibold text-foreground">
-                    Contact form powered by Web3Forms
+                    Reach the NEXii team directly
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Your message will go straight to the team using the access key already linked
-                    to this form.
-                  </p>
                 </div>
                 <div className="hidden rounded-2xl bg-primary/10 p-3 text-primary sm:block">
                   <ShieldCheck className="h-6 w-6" />

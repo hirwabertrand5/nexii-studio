@@ -13,6 +13,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { SUPPORTED_PLAN_CATEGORIES } from "@/features/public/api/plansApi";
 import {
   Sheet,
   SheetClose,
@@ -258,11 +259,16 @@ export default function RootLayout() {
             <div>
               <h4 className="mb-4 font-semibold">Categories</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/catalog?category=Bungalow" className="hover:underline">Bungalow</Link></li>
-                <li><Link to="/catalog?category=Duplex" className="hover:underline">Duplex</Link></li>
-                <li><Link to="/catalog?category=Modern+Villa" className="hover:underline">Modern Villa</Link></li>
-                <li><Link to="/catalog?category=African+Contemporary" className="hover:underline">African Contemporary</Link></li>
-                <li><Link to="/how-it-works" className="hover:underline">How It Works</Link></li>
+                {SUPPORTED_PLAN_CATEGORIES.map((category) => (
+                  <li key={category.value}>
+                    <Link
+                      to={`/catalog?category=${encodeURIComponent(category.value)}`}
+                      className="hover:underline"
+                    >
+                      {category.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 

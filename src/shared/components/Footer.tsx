@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router";
 import { Mail, Phone, Facebook, Twitter, Instagram, Linkedin, LogOut } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { SUPPORTED_PLAN_CATEGORIES } from "@/features/public/api/plansApi";
 
 export function Footer() {
   const navigate = useNavigate();
@@ -68,11 +69,16 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Categories</h3>
             <ul className="space-y-2 text-sm text-blue-100">
-              <li><Link to="/catalog" className="hover:text-white">Bungalows</Link></li>
-              <li><Link to="/catalog" className="hover:text-white">Duplexes</Link></li>
-              <li><Link to="/catalog" className="hover:text-white">Modern Villas</Link></li>
-              <li><Link to="/catalog" className="hover:text-white">Small Plot Homes</Link></li>
-              <li><Link to="/catalog" className="hover:text-white">African Contemporary</Link></li>
+              {SUPPORTED_PLAN_CATEGORIES.map((category) => (
+                <li key={category.value}>
+                  <Link
+                    to={`/catalog?category=${encodeURIComponent(category.value)}`}
+                    className="hover:text-white"
+                  >
+                    {category.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

@@ -47,6 +47,10 @@ function paymentStatusClass(status: string) {
   }
 }
 
+function getClientName(request: AdminDashboardActivity["newRequests"][number]) {
+  return request.user?.fullName ?? request.contactName ?? "Guest client";
+}
+
 export default function AdminDashboard() {
   const [overview, setOverview] = useState<AdminDashboardOverview | null>(null);
   const [activity, setActivity] = useState<AdminDashboardActivity | null>(null);
@@ -191,7 +195,7 @@ export default function AdminDashboard() {
                   <div key={request._id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
                       <p className="font-semibold text-sm">{request.projectTitle}</p>
-                      <p className="text-xs text-muted-foreground">{request.user?.fullName ?? "Unknown client"}</p>
+                      <p className="text-xs text-muted-foreground">{getClientName(request)}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded ${requestStatusClass(request.status)}`}>
                       {formatLabel(request.status)}

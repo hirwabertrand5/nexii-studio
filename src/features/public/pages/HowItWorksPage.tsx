@@ -9,7 +9,6 @@ import {
   FileSearch,
   MessageSquareQuote,
   PencilRuler,
-  Sparkles,
   Truck,
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -87,7 +86,6 @@ export default function HowItWorksPage() {
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-8 lg:py-24">
           <div className="max-w-2xl">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/90 backdrop-blur">
-              <Sparkles className="h-4 w-4" />
               A simple, guided buying experience
             </div>
             <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
@@ -124,9 +122,7 @@ export default function HowItWorksPage() {
           <Card className="border-0 bg-white/10 text-white shadow-2xl backdrop-blur">
             <CardContent className="p-6 sm:p-8">
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
-                  <Sparkles className="h-6 w-6" />
-                </div>
+                <div className="h-2.5 w-2.5 rounded-full bg-cyan-200" />
                 <div>
                   <p className="text-sm uppercase tracking-[0.2em] text-white/70">At a glance</p>
                   <h2 className="text-xl font-semibold">What happens next</h2>

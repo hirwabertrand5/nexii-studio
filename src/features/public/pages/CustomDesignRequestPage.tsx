@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ArrowLeft, CheckCircle, LogIn } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { createCustomRequest } from "@/features/public/api/customRequestApi";
@@ -31,46 +31,51 @@ const architecturalStyles = [
 ];
 
 const currencies = ["USD", "NGN", "KES", "RWF", "GHS", "ZAR"];
+const initialFormData = {
+  contactName: "",
+  contactEmail: "",
+  projectTitle: "",
+  projectType: "residential",
+  plotSize: "",
+  bedrooms: "3",
+  bathrooms: "2",
+  floors: "1",
+  budget: "",
+  budgetCurrency: "USD",
+  country: "",
+  location: "",
+  architecturalStyle: "modern",
+  description: "",
+};
 
 export default function CustomDesignRequest() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    projectTitle: "",
-    projectType: "residential",
-    plotSize: "",
-    bedrooms: "3",
-    bathrooms: "2",
-    floors: "1",
-    budget: "",
-    budgetCurrency: "USD",
-    country: "",
-    location: "",
-    architecturalStyle: "modern",
-    description: "",
-  });
+  const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
-    if (user?.country) {
-      setFormData((prev) => (prev.country ? prev : { ...prev, country: user.country ?? "" }));
-    }
-  }, [user?.country]);
+    setFormData((prev) => ({
+      ...prev,
+      contactName: prev.contactName || user?.fullName || "",
+      contactEmail: prev.contactEmail || user?.email || "",
+      country: prev.country || user?.country || "",
+    }));
+  }, [user?.country, user?.email, user?.fullName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!isAuthenticated || !user) {
-      toast.error("Please sign in before submitting a custom request.");
-      navigate("/login", { replace: false, state: { from: "/custom-design" } });
-      return;
-    }
 
     const plotSize = Number(formData.plotSize);
     const bedrooms = Number(formData.bedrooms);
     const bathrooms = Number(formData.bathrooms);
     const floors = Number(formData.floors);
     const budget = Number(formData.budget);
+
+    if (!formData.contactName.trim() || !formData.contactEmail.trim()) {
+      toast.error("Please enter your full name and email address.");
+      return;
+    }
 
     if ([plotSize, bedrooms, bathrooms, floors, budget].some((value) => Number.isNaN(value))) {
       toast.error("Please fill in all numeric fields with valid numbers.");
@@ -80,6 +85,8 @@ export default function CustomDesignRequest() {
     try {
       setSubmitting(true);
       const result = await createCustomRequest({
+        contactName: formData.contactName.trim(),
+        contactEmail: formData.contactEmail.trim(),
         projectTitle: formData.projectTitle.trim(),
         projectType: formData.projectType,
         plotSize,
@@ -95,12 +102,22 @@ export default function CustomDesignRequest() {
       });
 
       toast.success("Custom design request submitted successfully.");
-      navigate("/dashboard/custom-requests", {
-        replace: true,
-        state: {
-          requestId: result.requestId,
-        },
-      });
+      if (user) {
+        navigate("/dashboard/custom-requests", {
+          replace: true,
+          state: {
+            requestId: result.requestId,
+          },
+        });
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...initialFormData,
+        contactName: prev.contactName,
+        contactEmail: prev.contactEmail,
+        country: prev.country,
+      }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to submit your request.");
     } finally {
@@ -138,16 +155,22 @@ export default function CustomDesignRequest() {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <h3 className="font-semibold mb-4">Account Information</h3>
+                    <h3 className="font-semibold mb-4">Your Information</h3>
+                    {!user ? (
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        Guests can submit this form without signing in. Just enter your name and
+                        email so we can contact you about the request.
+                      </p>
+                    ) : null}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="name">Full Name</Label>
                         <Input
                           id="name"
-                          value={user?.fullName ?? ""}
-                          readOnly
-                          disabled
-                          className="bg-muted"
+                          value={formData.contactName}
+                          onChange={(e) => handleChange("contactName", e.target.value)}
+                          placeholder="Your full name"
+                          required
                         />
                       </div>
                       <div>
@@ -155,10 +178,10 @@ export default function CustomDesignRequest() {
                         <Input
                           id="email"
                           type="email"
-                          value={user?.email ?? ""}
-                          readOnly
-                          disabled
-                          className="bg-muted"
+                          value={formData.contactEmail}
+                          onChange={(e) => handleChange("contactEmail", e.target.value)}
+                          placeholder="you@example.com"
+                          required
                         />
                       </div>
                     </div>
@@ -370,7 +393,7 @@ export default function CustomDesignRequest() {
           <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Signed In User</h3>
+                <h3 className="font-semibold mb-4">{user ? "Signed In User" : "Guest Submission"}</h3>
                 {user ? (
                   <div className="space-y-2 text-sm">
                     <p className="font-semibold text-base">{user.fullName}</p>
@@ -380,14 +403,9 @@ export default function CustomDesignRequest() {
                 ) : (
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      Sign in first so your request is tied to your account, email, and future purchases.
+                      You can submit as a guest. Add your name and email in the form and we will
+                      use those details to follow up.
                     </p>
-                    <Link to="/login">
-                      <Button className="w-full">
-                        <LogIn className="w-4 h-4 mr-2" />
-                        Sign In
-                      </Button>
-                    </Link>
                   </div>
                 )}
               </CardContent>

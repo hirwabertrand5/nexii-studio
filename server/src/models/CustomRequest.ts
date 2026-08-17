@@ -64,7 +64,9 @@ export interface TimelineEntry {
 }
 
 export interface CustomRequestAttrs {
-  user: Types.ObjectId;
+  user: Types.ObjectId | null;
+  contactName: string;
+  contactEmail: string;
   projectTitle: string;
   projectType: ProjectType;
   plotSize: number; // in square meters
@@ -151,7 +153,9 @@ const timelineEntrySchema = new Schema<TimelineEntry>(
 
 const customRequestSchema = new Schema<CustomRequestAttrs>(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: false, default: null, index: true },
+    contactName: { type: String, required: true, trim: true, index: true },
+    contactEmail: { type: String, required: true, trim: true, lowercase: true, index: true },
     projectTitle: { type: String, required: true, trim: true, index: true },
     projectType: {
       type: String,
@@ -196,6 +200,7 @@ const customRequestSchema = new Schema<CustomRequestAttrs>(
 );
 
 customRequestSchema.index({ user: 1, createdAt: -1 });
+customRequestSchema.index({ contactEmail: 1, createdAt: -1 });
 customRequestSchema.index({ status: 1, createdAt: -1 });
 customRequestSchema.index({ projectType: 1, status: 1 });
 customRequestSchema.index({ country: 1, createdAt: -1 });

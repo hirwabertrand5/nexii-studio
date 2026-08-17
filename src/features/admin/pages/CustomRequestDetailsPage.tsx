@@ -52,6 +52,18 @@ function badgeClass(status?: string) {
   }
 }
 
+function getClientName(request: AdminRequestSummary) {
+  return request.user?.fullName ?? request.contactName ?? "Guest client";
+}
+
+function getClientEmail(request: AdminRequestSummary) {
+  return request.user?.email ?? request.contactEmail ?? "-";
+}
+
+function getClientCountry(request: AdminRequestSummary) {
+  return request.user?.country || request.country || "No country set";
+}
+
 export default function CustomRequestDetailsPage() {
   const navigate = useNavigate();
   const params = useParams();
@@ -206,9 +218,9 @@ export default function CustomRequestDetailsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Client</p>
-                <p className="font-semibold">{request.user.fullName}</p>
-                <p>{request.user.email}</p>
-                <p>{request.user.country || request.country || "No country set"}</p>
+                <p className="font-semibold">{getClientName(request)}</p>
+                <p>{getClientEmail(request)}</p>
+                <p>{getClientCountry(request)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Project Type</p>

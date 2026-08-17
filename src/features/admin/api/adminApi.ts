@@ -119,6 +119,8 @@ export interface AdminOrderSummary {
 export interface AdminRequestSummary {
   _id: string;
   projectTitle: string;
+  contactName?: string;
+  contactEmail?: string;
   projectType: string;
   plotSize: number;
   bedrooms: number;
@@ -131,7 +133,7 @@ export interface AdminRequestSummary {
   architecturalStyle: string;
   description: string;
   status: AdminRequestStatus;
-  user: { fullName: string; email: string; country?: string };
+  user: { fullName: string; email: string; country?: string } | null;
   assignedArchitect?: { fullName: string; email: string };
   quotation?: {
     amount: number;

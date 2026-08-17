@@ -58,6 +58,18 @@ function formatLabel(value: string) {
     .join(" ");
 }
 
+function getClientName(request: AdminRequestSummary) {
+  return request.user?.fullName ?? request.contactName ?? "Guest client";
+}
+
+function getClientEmail(request: AdminRequestSummary) {
+  return request.user?.email ?? request.contactEmail ?? "-";
+}
+
+function getClientCountry(request: AdminRequestSummary) {
+  return request.user?.country || request.country || "-";
+}
+
 function getStatusColor(status: string) {
   switch (status) {
     case "pending":
@@ -232,13 +244,13 @@ export default function AdminCustomRequests() {
                       <h4 className="font-semibold mb-3">Client Information</h4>
                       <div className="space-y-2 text-sm">
                         <p>
-                          <strong>Name:</strong> {request.user.fullName}
+                          <strong>Name:</strong> {getClientName(request)}
                         </p>
                         <p>
-                          <strong>Email:</strong> {request.user.email}
+                          <strong>Email:</strong> {getClientEmail(request)}
                         </p>
                         <p>
-                          <strong>Country:</strong> {request.user.country || request.country || "-"}
+                          <strong>Country:</strong> {getClientCountry(request)}
                         </p>
                       </div>
                     </div>
@@ -300,7 +312,7 @@ export default function AdminCustomRequests() {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Send Quote to {request.user.fullName}</DialogTitle>
+                            <DialogTitle>Send Quote to {getClientName(request)}</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <div>

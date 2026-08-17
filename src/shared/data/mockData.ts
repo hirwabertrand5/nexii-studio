@@ -150,7 +150,7 @@ export const housePlans: HousePlan[] = [
   {
     id: '4',
     name: 'Small Plot Home',
-    category: 'Small Plot Homes',
+    category: 'Small Plot Home',
     bedrooms: 2,
     bathrooms: 2,
     floors: 2,
@@ -352,7 +352,7 @@ export const categories = [
   'Bungalow',
   'Duplex',
   'Modern Villa',
-  'Small Plot Homes',
+  'Small Plot Home',
   'African Contemporary',
 ];
 

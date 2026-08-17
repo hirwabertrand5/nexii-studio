@@ -9,10 +9,11 @@ import { getRequestPublicBaseUrl } from "../utils/uploadStorage.js";
 
 // Create custom request
 export const createCustomRequest = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.auth?.userId;
-  if (!userId) throw new AppError("User not authenticated", 401);
+  const userId = req.auth?.userId ?? null;
 
   const {
+    contactName,
+    contactEmail,
     projectTitle,
     projectType,
     plotSize,
@@ -31,6 +32,8 @@ export const createCustomRequest = asyncHandler(async (req: Request, res: Respon
 
   // Validation
   const requiredFields = [
+    "contactName",
+    "contactEmail",
     "projectTitle",
     "projectType",
     "plotSize",
@@ -50,8 +53,17 @@ export const createCustomRequest = asyncHandler(async (req: Request, res: Respon
     }
   }
 
+  if (!String(contactName ?? "").trim()) {
+    throw new AppError("contactName is required", 400);
+  }
+  if (!String(contactEmail ?? "").trim()) {
+    throw new AppError("contactEmail is required", 400);
+  }
+
   const customRequest = await CustomRequest.create({
     user: userId,
+    contactName,
+    contactEmail,
     projectTitle,
     projectType,
     plotSize,
@@ -96,7 +108,7 @@ export const createCustomRequest = asyncHandler(async (req: Request, res: Respon
     clientMessages: [
       {
         senderType: "admin",
-        message: `Thank you for submitting your ${projectTitle} request! We've received your details and will review them shortly.`,
+        message: `Thank you, ${String(contactName).trim()}, for submitting your ${projectTitle} request! We've received your details and will review them shortly.`,
         createdAt: new Date()
       }
     ],
@@ -159,7 +171,7 @@ export const getRequestDetails = asyncHandler(async (req: Request, res: Response
   if (!request) throw new AppError("Request not found", 404);
 
   // Check ownership
-  if (request.user.toString() !== userId) {
+  if (!request.user || request.user.toString() !== userId) {
     throw new AppError("You don't have access to this request", 403);
   }
 
@@ -176,7 +188,7 @@ export const uploadRequestFiles = asyncHandler(async (req: Request, res: Respons
   if (!request) throw new AppError("Request not found", 404);
 
   // Check ownership
-  if (request.user.toString() !== userId) {
+  if (!request.user || request.user.toString() !== userId) {
     throw new AppError("You don't have access to this request", 403);
   }
   const files = (req as any).files as Array<{buffer: Buffer; originalname: string; mimetype: string; size: number}> | undefined;
@@ -234,7 +246,7 @@ export const respondToQuotation = asyncHandler(async (req: Request, res: Respons
   const request = await CustomRequest.findById(id);
   if (!request) throw new AppError("Request not found", 404);
 
-  if (request.user.toString() !== userId) {
+  if (!request.user || request.user.toString() !== userId) {
     throw new AppError("You don't have access to this request", 403);
   }
 
@@ -280,7 +292,7 @@ export const addMessageToRequest = asyncHandler(async (req: Request, res: Respon
   const request = await CustomRequest.findById(id);
   if (!request) throw new AppError("Request not found", 404);
 
-  if (request.user.toString() !== userId) {
+  if (!request.user || request.user.toString() !== userId) {
     throw new AppError("You don't have access to this request", 403);
   }
 
@@ -301,10 +313,10 @@ export const getRequestTimeline = asyncHandler(async (req: Request, res: Respons
   const userId = req.auth?.userId;
   if (!userId) throw new AppError("User not authenticated", 401);
 
-  const request = await CustomRequest.findById(id).select("timeline status quotation");
+  const request = await CustomRequest.findById(id).select("user timeline status quotation");
   if (!request) throw new AppError("Request not found", 404);
 
-  if (request.user.toString() !== userId) {
+  if (!request.user || request.user.toString() !== userId) {
     throw new AppError("You don't have access to this request", 403);
   }
 
