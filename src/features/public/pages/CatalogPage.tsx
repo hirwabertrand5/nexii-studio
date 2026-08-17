@@ -280,9 +280,9 @@ export default function Catalog() {
                 <p className="text-muted-foreground">No plans match your filters. Try adjusting your criteria.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                 {filteredPlans.map((plan) => (
-                  <Card key={plan._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <Card key={plan._id} className="h-full overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="aspect-[4/3] bg-muted">
                       <ImageWithFallback
                         src={resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0])}
@@ -290,15 +290,15 @@ export default function Catalog() {
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <CardContent className="p-4">
+                    <CardContent className="flex h-full flex-col p-3 sm:p-4">
                       <div className="mb-2">
                         <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
                           {formatPlanCategoryLabel(plan.category)}
                         </span>
                       </div>
-                      <h3 className="text-lg mb-3">{plan.title}</h3>
+                      <h3 className="mb-2 text-sm sm:mb-3 sm:text-lg">{plan.title}</h3>
 
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+                      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:gap-4 sm:text-sm">
                         <div className="flex items-center gap-1">
                           <Bed className="w-4 h-4" />
                           <span>{plan.bedrooms}</span>
@@ -313,16 +313,16 @@ export default function Catalog() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-xs text-muted-foreground">Starting from</p>
-                          <p className="text-xl font-bold text-primary">
+                          <p className="text-lg font-bold text-primary sm:text-xl">
                             ${plan.price.toLocaleString()}
                           </p>
                         </div>
-                        <Link to={`/plan/${plan._id}`}>
-                          <Button size="sm">View</Button>
-                        </Link>
+                        <Button asChild size="sm" className="w-full sm:w-auto">
+                          <Link to={`/plan/${plan._id}`}>View</Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

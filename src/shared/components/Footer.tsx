@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router";
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, LogOut } from "lucide-react";
+import { Mail, Phone, Facebook, Twitter, Instagram, Linkedin, LogOut } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
@@ -15,10 +15,10 @@ export function Footer() {
 
   return (
     <footer className="bg-[#1e3a8a] text-white mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
           {/* About */}
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
                 <span className="text-[#1e3a8a] font-bold text-sm"></span>
@@ -77,7 +77,7 @@ export function Footer() {
           </div>
 
           {/* Contact */}
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <h3 className="font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-3 text-sm text-blue-100">
               <li className="flex items-start gap-2">
@@ -87,10 +87,6 @@ export function Footer() {
               <li className="flex items-start gap-2">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>+250 796066681</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Lagos, Nigeria</span>
               </li>
             </ul>
             <div className="flex gap-3 mt-4">

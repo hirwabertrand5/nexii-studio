@@ -114,7 +114,7 @@ export default function PlanDetails() {
                   />
                 </div>
                 {galleryImages.length > 1 && (
-                  <div className="grid grid-cols-3 gap-2 p-4">
+                  <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 md:grid-cols-4">
                     {galleryImages.map((img, idx) => (
                       <button
                         key={`${img}-${idx}`}
@@ -303,9 +303,9 @@ export default function PlanDetails() {
         {relatedPlans.length > 0 && (
           <div className="mt-12">
             <h3 className="text-2xl mb-6">Related Plans</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {relatedPlans.map((related) => (
-                <Card key={related._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <Card key={related._id} className="h-full overflow-hidden transition-shadow hover:shadow-lg">
                   <div className="aspect-[4/3] bg-muted">
                     <ImageWithFallback
                       src={resolvePlanImageUrl(related.images?.[0] ?? related.previewImages?.[0])}
@@ -313,16 +313,18 @@ export default function PlanDetails() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2">{related.title}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
+                  <CardContent className="flex h-full flex-col p-3 sm:p-4">
+                    <h4 className="mb-2 text-sm font-semibold sm:text-base">{related.title}</h4>
+                    <p className="mb-3 text-xs text-muted-foreground sm:text-sm">
                       {formatPlanCategoryLabel(related.category)}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-primary">${related.price.toLocaleString()}</p>
-                      <Link to={`/plan/${related._id}`}>
-                        <Button size="sm" variant="outline">View</Button>
-                      </Link>
+                    <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm font-bold text-primary sm:text-base">
+                        ${related.price.toLocaleString()}
+                      </p>
+                      <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
+                        <Link to={`/plan/${related._id}`}>View</Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

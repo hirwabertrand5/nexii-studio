@@ -47,7 +47,7 @@ function PlanCard({ plan }: { plan: PublicPlanSummary }) {
   const imageSrc = resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0]);
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
       <div className="aspect-[4/3] overflow-hidden bg-muted">
         <ImageWithFallback
           src={imageSrc}
@@ -55,29 +55,29 @@ function PlanCard({ plan }: { plan: PublicPlanSummary }) {
           className="block h-full w-full object-cover object-center"
         />
       </div>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="mb-2">
           <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
             {formatPlanCategoryLabel(plan.category)}
           </span>
         </div>
-        <h3 className="text-xl mb-2">{plan.title}</h3>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+        <h3 className="mb-2 text-base sm:text-xl">{plan.title}</h3>
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:gap-4 sm:text-sm">
           <span>{plan.bedrooms} Beds</span>
           <span>•</span>
           <span>{plan.bathrooms} Baths</span>
           <span>•</span>
           <span>{plan.totalArea}m²</span>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl font-bold text-primary sm:text-2xl">
               {formatUsd(plan.price)}
             </p>
           </div>
-          <Link to={`/plan/${plan._id}`}>
-            <Button>View Plan</Button>
-          </Link>
+          <Button asChild className="w-full sm:w-auto">
+            <Link to={`/plan/${plan._id}`}>View Plan</Link>
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -203,7 +203,7 @@ export default function Home() {
               No published plans yet. Once an admin publishes a plan, it will appear here automatically.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-8">
               {visibleFeaturedPlans.map((plan) => (
                 <PlanCard key={plan._id} plan={plan} />
               ))}
@@ -229,17 +229,17 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
             {categories.map((category) => {
               const Icon = categoryIcons[category.label] ?? Building2;
 
               return (
                 <Link key={category.value} to={`/catalog?category=${encodeURIComponent(category.value)}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="p-6 text-center">
-                      <Icon className="w-12 h-12 mx-auto mb-3 text-primary" />
-                      <h4>{category.label}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
+                  <Card className="cursor-pointer transition-shadow hover:shadow-lg">
+                    <CardContent className="p-4 text-center sm:p-6">
+                      <Icon className="mx-auto mb-3 h-10 w-10 text-primary sm:h-12 sm:w-12" />
+                      <h4 className="text-sm sm:text-base">{category.label}</h4>
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {category.count} live plan{category.count === 1 ? "" : "s"}
                       </p>
                     </CardContent>
@@ -270,7 +270,7 @@ export default function Home() {
               No live plans available yet.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-8">
               {visibleBestPlans.map((plan) => (
                 <PlanCard key={plan._id} plan={plan} />
               ))}
