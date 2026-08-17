@@ -27,6 +27,8 @@ function withSuspense<T extends ComponentType<any>>(importer: () => Promise<{ de
 const HomePage = withSuspense(() => import("@/features/public/pages/HomePage"));
 const CatalogPage = withSuspense(() => import("@/features/public/pages/CatalogPage"));
 const PlanDetailsPage = withSuspense(() => import("@/features/public/pages/PlanDetailsPage"));
+const HowItWorksPage = withSuspense(() => import("@/features/public/pages/HowItWorksPage"));
+const ContactPage = withSuspense(() => import("@/features/public/pages/ContactPage"));
 const CustomDesignRequestPage = withSuspense(() => import("@/features/public/pages/CustomDesignRequestPage"));
 const CheckoutPage = withSuspense(() => import("@/features/public/pages/CheckoutPage"));
 const PaymentStatusPage = withSuspense(() => import("@/features/public/pages/PaymentStatusPage"));
@@ -61,6 +63,8 @@ export const router = createBrowserRouter([
       { index: true, Component: HomePage },
       { path: "catalog", Component: CatalogPage },
       { path: "plan/:id", Component: PlanDetailsPage },
+      { path: "how-it-works", Component: HowItWorksPage },
+      { path: "contact", Component: ContactPage },
       { path: "custom-design", Component: CustomDesignRequestPage },
       { path: "login", Component: LoginPage },
       { path: "register", Component: RegisterPage },

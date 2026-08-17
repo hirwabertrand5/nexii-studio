@@ -40,8 +40,8 @@ export default function RootLayout() {
     { to: "/", label: "Home", icon: Home },
     { to: "/catalog", label: "House Plans", icon: Building2 },
     { to: "/custom-design", label: "Custom Design", icon: FileText },
-    { href: "#how-it-works", label: "How It Works", icon: CircleHelp },
-    { href: "#contact", label: "Contact", icon: Phone },
+    { to: "/how-it-works", label: "How It Works", icon: CircleHelp },
+    { to: "/contact", label: "Contact", icon: Phone },
   ] as const;
 
   const handleLogout = async () => {
@@ -77,12 +77,12 @@ export default function RootLayout() {
               <Link to="/custom-design" className="text-foreground transition-colors hover:text-primary">
                 Custom Design
               </Link>
-              <a href="#how-it-works" className="text-foreground transition-colors hover:text-primary">
+              <Link to="/how-it-works" className="text-foreground transition-colors hover:text-primary">
                 How It Works
-              </a>
-              <a href="#contact" className="text-foreground transition-colors hover:text-primary">
+              </Link>
+              <Link to="/contact" className="text-foreground transition-colors hover:text-primary">
                 Contact
-              </a>
+              </Link>
             </div>
 
             <div className="hidden items-center gap-4 md:flex">
@@ -231,7 +231,7 @@ export default function RootLayout() {
       </main>
 
       {/* Footer */}
-      <footer id="contact" className="bg-accent text-accent-foreground">
+      <footer className="bg-accent text-accent-foreground">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
             <div className="col-span-2 md:col-span-1">
@@ -249,8 +249,9 @@ export default function RootLayout() {
               <ul className="space-y-2 text-sm">
                 <li><Link to="/catalog" className="hover:underline">Browse Plans</Link></li>
                 <li><Link to="/custom-design" className="hover:underline">Custom Design</Link></li>
-                <li><a href="#how-it-works" className="hover:underline">How It Works</a></li>
+                <li><Link to="/how-it-works" className="hover:underline">How It Works</Link></li>
                 <li><Link to="/register" className="hover:underline">Get Started</Link></li>
+                <li><Link to="/contact" className="hover:underline">Contact</Link></li>
               </ul>
             </div>
 
@@ -261,6 +262,7 @@ export default function RootLayout() {
                 <li><Link to="/catalog?category=Duplex" className="hover:underline">Duplex</Link></li>
                 <li><Link to="/catalog?category=Modern+Villa" className="hover:underline">Modern Villa</Link></li>
                 <li><Link to="/catalog?category=African+Contemporary" className="hover:underline">African Contemporary</Link></li>
+                <li><Link to="/how-it-works" className="hover:underline">How It Works</Link></li>
               </ul>
             </div>
 
