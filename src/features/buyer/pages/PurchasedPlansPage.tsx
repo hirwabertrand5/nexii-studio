@@ -19,16 +19,21 @@ type DownloadFile = {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&q=80";
 
+function isPlanObject(plan: BuyerOrderPlanItem["plan"]): plan is Exclude<BuyerOrderPlanItem["plan"], string> {
+  return Boolean(plan) && typeof plan === "object";
+}
+
 function getPlanImage(plan: BuyerOrderPlanItem) {
   let src: string | undefined | null = undefined;
-  if (typeof plan.plan === "object") {
+  if (isPlanObject(plan.plan)) {
     src = plan.plan.previewImages?.[0] || plan.plan.images?.[0] || null;
   }
   return resolvePlanImageUrl(src ?? null);
 }
 
 function getPlanId(plan: BuyerOrderPlanItem) {
-  return typeof plan.plan === "object" ? plan.plan._id : String(plan.plan);
+  if (isPlanObject(plan.plan)) return plan.plan._id;
+  return typeof plan.plan === "string" ? plan.plan : "";
 }
 
 function getOrderPaymentLabel(order: BuyerOrder) {
@@ -175,7 +180,9 @@ export default function PurchasedPlansPage() {
 
                 <div className="space-y-4">
                   {order.plans.map((plan) => {
-                    const resolvedPlan = typeof plan.plan === "object" ? plan.plan : null;
+                    const resolvedPlan = isPlanObject(plan.plan) ? plan.plan : null;
+                    const planId = getPlanId(plan);
+                    const canLoadDeliverables = Boolean(order.downloadAccess && planId);
                     return (
                       <div key={resolvedPlan?._id ?? plan.title} className="grid grid-cols-1 md:grid-cols-12 gap-6 border border-border rounded-lg p-4">
                         <div className="md:col-span-3">
@@ -192,10 +199,10 @@ export default function PurchasedPlansPage() {
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <h4 className="text-lg mb-1">{plan.title}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {resolvedPlan?.category ?? "House plan"}
-                              </p>
-                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {resolvedPlan?.category ?? "House plan"}
+                            </p>
+                          </div>
                             {order.downloadAccess ? (
                               <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded">
                                 Ready
@@ -209,7 +216,7 @@ export default function PurchasedPlansPage() {
 
                           <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                             <p><strong>Price:</strong> {order.currency} {plan.price.toLocaleString()}</p>
-                            <p><strong>Plan ID:</strong> {getPlanId(plan)}</p>
+                            <p><strong>Plan ID:</strong> {planId || "Unavailable"}</p>
                             <p><strong>Order Status:</strong> {getOrderPaymentLabel(order)}</p>
                             <p><strong>Payment Method:</strong> {order.paymentMethod}</p>
                           </div>
@@ -224,16 +231,16 @@ export default function PurchasedPlansPage() {
                             <p className="text-sm text-muted-foreground mb-4">
                               Files unlock automatically after payment and stay private to your account.
                             </p>
-                            {order.downloadAccess && (
+                            {canLoadDeliverables && (
                               <div className="space-y-2 mb-4">
-                                {loadingDeliverables[getPlanId(plan)] ? (
+                                {loadingDeliverables[planId] ? (
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Loader2Icon className="w-4 h-4 animate-spin" />
                                     Loading files...
                                   </div>
-                                ) : (deliverables[getPlanId(plan)]?.length ?? 0) > 0 ? (
+                                ) : (deliverables[planId]?.length ?? 0) > 0 ? (
                                   <ul className="space-y-2 text-sm">
-                                    {deliverables[getPlanId(plan)]?.map((file) => (
+                                    {deliverables[planId]?.map((file) => (
                                       <li key={file.fileName} className="rounded border border-border bg-background/70 px-3 py-2">
                                         <div className="flex items-center justify-between gap-2">
                                           <span>{file.label}</span>
@@ -255,18 +262,18 @@ export default function PurchasedPlansPage() {
                               variant="outline"
                               className="w-full"
                               onClick={() => handleDownload(plan)}
-                              disabled={!order.downloadAccess || activeDownload === getPlanId(plan)}
+                              disabled={!canLoadDeliverables || activeDownload === planId}
                             >
-                              {activeDownload === getPlanId(plan) ? (
+                              {activeDownload === planId ? (
                                 <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
                               ) : (
                                 <DownloadIcon className="w-4 h-4 mr-2" />
                               )}
-                              {order.downloadAccess ? "Refresh Access" : "Not Available"}
+                              {canLoadDeliverables ? "Refresh Access" : "Not Available"}
                             </Button>
-                            {!order.downloadAccess && order.paymentStatus !== "refunded" && order.paymentStatus !== "cancelled" && (
+                            {!canLoadDeliverables && order.paymentStatus !== "refunded" && order.paymentStatus !== "cancelled" && planId && (
                               <Button asChild className="mt-3 w-full">
-                                <a href={`/checkout/${getPlanId(plan)}`}>Retry Payment</a>
+                                <a href={`/checkout/${planId}`}>Retry Payment</a>
                               </Button>
                             )}
                           </div>
