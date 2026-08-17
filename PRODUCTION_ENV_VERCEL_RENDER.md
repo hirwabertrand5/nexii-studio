@@ -11,11 +11,12 @@ Use these values for a split deployment:
 Set these in the Vercel project environment variables:
 
 ```env
-VITE_API_URL=https://nexii-studio-api.onrender.com
 VITE_GOOGLE_CLIENT_ID=540314344768-8v68ijf4hf39tue2vqj2kk4dddsboam6.apps.googleusercontent.com
 VITE_STRIPE_PUBLIC_KEY=pk_test_51TrGwIHIcFa23L5rRKNYQ7SU9f6ua2fLwGVDqsXPYAWSGFh6pKLLHKdJhat6YteC0idGncPxncbiRkfHgCy6jTMz00SVZ2Pjuo
 VITE_PAYPAL_CLIENT_ID=your_paypal_client_id
 ```
+
+The frontend now calls `/api/*` on the same origin in production, and `vercel.json` rewrites those requests to Render. This keeps the auth cookies first-party and avoids cross-site cookie problems.
 
 ## Render Backend
 

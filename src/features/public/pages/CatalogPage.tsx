@@ -282,7 +282,8 @@ export default function Catalog() {
             ) : (
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                 {filteredPlans.map((plan) => (
-                  <Card key={plan._id} className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+                  <Link key={plan._id} to={`/plan/${plan._id}`} className="block h-full">
+                  <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="aspect-[4/3] bg-muted">
                       <ImageWithFallback
                         src={resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0])}
@@ -320,12 +321,13 @@ export default function Catalog() {
                             ${plan.price.toLocaleString()}
                           </p>
                         </div>
-                        <Button asChild size="sm" className="w-full sm:w-auto">
-                          <Link to={`/plan/${plan._id}`}>View</Link>
+                        <Button asChild size="sm" className="pointer-events-none w-full sm:w-auto">
+                          <span>View</span>
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
+                  </Link>
                 ))}
               </div>
             )}

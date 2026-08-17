@@ -4,7 +4,7 @@ function normalizeBaseUrl(value?: string) {
   return trimmed.replace(/\/$/, "");
 }
 
-const API_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+const API_URL = import.meta.env.DEV ? normalizeBaseUrl(import.meta.env.VITE_API_URL) : "";
 
 export class HttpError extends Error {
   status: number;

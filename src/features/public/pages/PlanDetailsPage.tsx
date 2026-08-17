@@ -305,7 +305,8 @@ export default function PlanDetails() {
             <h3 className="text-2xl mb-6">Related Plans</h3>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {relatedPlans.map((related) => (
-                <Card key={related._id} className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+                <Link key={related._id} to={`/plan/${related._id}`} className="block h-full">
+                <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
                   <div className="aspect-[4/3] bg-muted">
                     <ImageWithFallback
                       src={resolvePlanImageUrl(related.images?.[0] ?? related.previewImages?.[0])}
@@ -322,12 +323,13 @@ export default function PlanDetails() {
                       <p className="text-sm font-bold text-primary sm:text-base">
                         ${related.price.toLocaleString()}
                       </p>
-                      <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
-                        <Link to={`/plan/${related._id}`}>View</Link>
+                      <Button asChild size="sm" variant="outline" className="pointer-events-none w-full sm:w-auto">
+                        <span>View</span>
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
+                </Link>
               ))}
             </div>
           </div>

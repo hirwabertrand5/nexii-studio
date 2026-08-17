@@ -47,7 +47,8 @@ function PlanCard({ plan }: { plan: PublicPlanSummary }) {
   const imageSrc = resolvePlanImageUrl(plan.images?.[0] ?? plan.previewImages?.[0]);
 
   return (
-    <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+    <Link to={`/plan/${plan._id}`} className="block h-full">
+      <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
       <div className="aspect-[4/3] overflow-hidden bg-muted">
         <ImageWithFallback
           src={imageSrc}
@@ -75,12 +76,13 @@ function PlanCard({ plan }: { plan: PublicPlanSummary }) {
               {formatUsd(plan.price)}
             </p>
           </div>
-          <Button asChild className="w-full sm:w-auto">
-            <Link to={`/plan/${plan._id}`}>View Plan</Link>
+          <Button asChild className="pointer-events-none w-full sm:w-auto">
+            <span>View Plan</span>
           </Button>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
